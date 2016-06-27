@@ -1,0 +1,4 @@
+[submodule "externals/drake"]
+	path = externals/drake
+	url = https://github.com/sammy-tri/drake.git
+	branch = iiwa_lcm
