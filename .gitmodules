@@ -2,3 +2,6 @@
 	path = externals/drake
 	url = https://github.com/sammy-tri/drake.git
 	branch = iiwa_lcm
+[submodule "externals/kuka-fri"]
+	path = externals/kuka-fri
+	url = git@github.com:ToyotaResearchInstitute/kuka-fri.git
