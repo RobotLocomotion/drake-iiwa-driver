@@ -7,7 +7,7 @@ set(cmake_BUILD_COMMANND "")
 set(drake_CONFIGURE_COMMANND "")
 set(drake_BUILD_COMMANND "")
 set(kuka-fri_BUILD_COMMAND make -C build/GNUMake)
-set(EXTERNAL_PROJECTS drake kuka-fri)
+set(EXTERNAL_PROJECTS cmake drake kuka-fri)
 
 include(ExternalProject)
 find_package(Git REQUIRED)
