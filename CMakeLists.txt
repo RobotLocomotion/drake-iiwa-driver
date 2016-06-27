@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 2.8.5)
 project(drake-kuka-driver)
 
-set(cmake_BUILD_COMMANND "")
-
 # We'll manually build the subset of drake we want...
 set(drake_CONFIGURE_COMMANND "")
 set(drake_BUILD_COMMANND "")
@@ -40,3 +38,14 @@ foreach(proj ${EXTERNAL_PROJECTS})
     INSTALL_COMMAND ""
     )
 endforeach()
+
+# Add the actual driver as an external project which depends on the
+# others.
+ExternalProject_ADD(kuka-driver
+  SOURCE_DIR "${PROJECT_SOURCE_DIR}/kuka-driver"
+  DOWNLOAD_COMMAND ""
+  UPDATE_COMMAND ""
+  BUILD_COMMAND make
+  INSTALL_COMMAND cp bin/kuka_driver ${PROJECT_BINARY_DIR}
+  DEPENDS ${EXTERNAL_PROJECTS}
+  )
