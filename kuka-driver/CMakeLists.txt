@@ -5,7 +5,6 @@ include (../externals/cmake/lcmtypes.cmake)
 include (../externals/cmake/pods.cmake)
 add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_command.lcm)
 add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_status.lcm)
-add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_trajectory.lcm)
 lcmtypes_build()
 
 include_directories(../externals/kuka-fri/include)
