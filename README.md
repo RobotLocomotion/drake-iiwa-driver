@@ -6,9 +6,6 @@ pieces, a Java application to run on the KUKA Sunrise cabinet, and an
 local C++ application communicating with the cabinet using the FRI
 protocol.
 
-TODO(sam.creasey) Add a section explaining the FRI C++ portions, the externals, and building the resulting driver
-
-
 ## Sunrise Workbench
 
 Provisioning the IIWA arm must be done from Sunrise Workbench.
@@ -39,7 +36,7 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
    * Uncheck row 2 "Operator Protection",
    * Uncheck row 3 "Safety Stop"
 
- * Copy in DrakeFRIDriver.java over the old one (make sure Sunrise sees the update) in DrakeFRIDriver/src/drake_fri/
+ * Copy in kuka_driver/DrakeFRIDriver.java over the old one (make sure Sunrise sees the update) in DrakeFRIDriver/src/drake_fri/
 
  * In "Package Explorer", select StationSetup.cat
   * Installation
@@ -47,3 +44,23 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 
  * Press the "sync" button.  It's on the toolbar at the top, 5th from the right.  It looks a bit like a square with a couple of arrows over it (though it doesn't look much like this).  This will install the application.
   * Execute
+
+## C++ driver
+
+TODO(sam.creasey) Update the Drake external to point to master once
+the needed changes are integrated.
+
+Once Sunrise Workbench is provisioned, you'll need to build the local
+interface which communicated with the iiwa arm using FRI, and with the
+controlling application using LCM.  Compiling the project in this
+directory will output a single program called "kuka_driver".  Running
+it with no arguments will connect to the IIWA at it's default address
+and port (192.170.10.2, port 30200), negotiate LCM into the command
+state, and report the IIWA status via LCM.  If no LCM control messages
+are received, the arm will be in a "limp" state where it can be moved
+externally subject to the configured impedence force (hardcoded in the
+Java application).  Once it receives a command via LCM, that position
+will be commanded until the next LCM position is received.
+
+An application wishing to control the arm should listen to LCM for
+status updates and command the joints appropriately in response.
