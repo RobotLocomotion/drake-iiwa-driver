@@ -6,9 +6,20 @@ pieces, a Java application to run on the KUKA Sunrise cabinet, and an
 local C++ application communicating with the cabinet using the FRI
 protocol.
 
+The KUKA control cabinet has two network interfaces which are
+configured with static IP addresses.  Both will need to be connected
+to communicate with the arm.
+
+ * X66: 172.31.1.147/16 -- This interface is used by Sunrise Workbench to load new software onto the controller.
+ * KONI: 192.170.10.2/24 -- This is the interface which FRI clients communicate over.  That's not in the reserved IP space, so it could potentially cause a conflict if you happen to want to contact a host in that subnet.
+
 ## Sunrise Workbench
 
 Provisioning the IIWA arm must be done from Sunrise Workbench.
+
+The computer running Sunrise Workbench must be configured with an
+address which can communicate with 172.13.1.47/16, and which is
+connected to the X66 port.
 
 TODO(sam.creasey) Can I just zip up a project/workspace?
 
@@ -49,6 +60,11 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 
 TODO(sam.creasey) Update the Drake external to point to master once
 the needed changes are integrated.
+
+The computer running Sunrise Workbench must be configured with an
+address which can communicate with 192.170.10.2/24, and which is
+connected to the KONI port.  KUKA recommends directly attaching the
+computer to the KONI port instead of using a switch.
 
 Once Sunrise Workbench is provisioned, you'll need to build the local
 interface which communicated with the iiwa arm using FRI, and with the
