@@ -78,7 +78,6 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     PublishStateUpdate();
   }
   virtual void command() {
-    KUKA::FRI::LBRClient::command();
     PublishStateUpdate();
 
     if (lcm_status_.timestamp == -1) {
