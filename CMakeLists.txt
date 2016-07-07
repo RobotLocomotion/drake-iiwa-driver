@@ -41,11 +41,10 @@ endforeach()
 
 # Add the actual driver as an external project which depends on the
 # others.
-ExternalProject_ADD(kuka-driver
+ExternalProject_Add(kuka-driver
   SOURCE_DIR "${PROJECT_SOURCE_DIR}/kuka-driver"
   DOWNLOAD_COMMAND ""
   UPDATE_COMMAND ""
-  BUILD_COMMAND make
   INSTALL_COMMAND cp bin/kuka_driver ${PROJECT_BINARY_DIR}
   DEPENDS ${EXTERNAL_PROJECTS}
   )
