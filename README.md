@@ -67,9 +67,9 @@ connected to the KONI port.  KUKA recommends directly attaching the
 computer to the KONI port instead of using a switch.
 
 Once Sunrise Workbench is provisioned, you'll need to build the local
-interface which communicated with the iiwa arm using FRI, and with the
-controlling application using LCM.  Compiling the project in this
-directory will output a single program called "kuka_driver".  Running
+interface which communicates with the iiwa arm using FRI, and with the
+controlling application using LCM.  Compiling this project will output
+a single program in the build directory called "kuka_driver".  Running
 it with no arguments will connect to the IIWA at it's default address
 and port (192.170.10.2, port 30200), negotiate LCM into the command
 state, and report the IIWA status via LCM.  If no LCM control messages
