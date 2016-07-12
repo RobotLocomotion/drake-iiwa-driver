@@ -20,7 +20,7 @@ import com.kuka.roboticsAPI.motionModel.controlModeModel.JointImpedanceControlMo
 /**
  * Creates a FRI Session.
  */
-public class DrakeFRIDriver extends RoboticsAPIApplication
+public class DrakeFRIPositionDriver extends RoboticsAPIApplication
 {
     private Controller _lbrController;
     private LBR _lbr;
@@ -100,7 +100,7 @@ public class DrakeFRIDriver extends RoboticsAPIApplication
      */
     public static void main(final String[] args)
     {
-        final DrakeFRIDriver app = new DrakeFRIDriver();
+        final DrakeFRIPositionDriver app = new DrakeFRIPositionDriver();
         app.runApplication();
     }
 

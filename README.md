@@ -47,7 +47,7 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
    * Uncheck row 2 "Operator Protection",
    * Uncheck row 3 "Safety Stop"
 
- * Copy in kuka_driver/DrakeFRIDriver.java over the old one (make sure Sunrise sees the update) in DrakeFRIDriver/src/drake_fri/
+ * Copy in kuka-driver/DrakeFRIPositionDriver.java and kuka-driver/DrakeFRITorqueDriver (make sure Sunrise sees the update, you may need to import the files into the project) in DrakeFRIDriver/src/drake_fri/  You can remove any exising DrakeFRIDriver.
 
  * In "Package Explorer", select StationSetup.cat
   * Installation

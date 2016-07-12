@@ -1,9 +1,11 @@
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
 
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 
 #include <lcm/lcm-cpp.hpp>
 
@@ -75,6 +77,14 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
 
   virtual void waitForCommand() {
     KUKA::FRI::LBRClient::waitForCommand();
+
+    // The value of the torques sent in waitForCommand doesn't matter,
+    // but we have to send something.
+    if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
+      double torque[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
+      robotCommand().setTorque(torque);
+    }
+
     PublishStateUpdate();
   }
   virtual void command() {
@@ -96,6 +106,28 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     }
     ApplyJointLimits(pos);
     robotCommand().setJointPosition(pos);
+
+    // Check if we're in torque mode, and send torque commands too if
+    // we are.
+    if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
+      double torque[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
+      if (lcm_command_.timestamp != -1) {
+        if (lcm_command_.num_torques != num_joints_) {
+          throw std::runtime_error(
+              "No torque values specified (or incorrect number) "
+              "while in torque command mode.");
+        }
+        memcpy(torque, lcm_command_.joint_torque.data(),
+               num_joints_ * sizeof(double));
+      }
+      // TODO(sam.creasey): Is there a sensible torque limit to apply here?
+      robotCommand().setTorque(torque);
+    } else {
+      if (lcm_command_.timestamp != -1 && lcm_command_.num_torques != 0) {
+        throw std::runtime_error(
+            "Torque values specified when not in torque command mode.");
+      }
+    }
   }
 
  private:
@@ -150,7 +182,6 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
 };
 
 int do_main(int argc, const char* argv[]) {
-
   KUKA::FRI::UdpConnection connection;
   KukaLCMClient client;
   KUKA::FRI::ClientApplication app(connection, client);
