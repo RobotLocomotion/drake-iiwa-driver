@@ -13,6 +13,12 @@ to communicate with the arm.
  * X66: 172.31.1.147/16 -- This interface is used by Sunrise Workbench to load new software onto the controller.
  * KONI: 192.170.10.2/24 -- This is the interface which FRI clients communicate over.  That's not in the reserved IP space, so it could potentially cause a conflict if you happen to want to contact a host in that subnet.
 
+Selecting the command mode to use for the arm (position vs. torque) is
+done by starting a different Java application on the arm
+(DrakeFRIPositionDriver vs. DrakeFRITorqueDriver).  The C++ driver
+will detect which mode the FRI connection is in and send commands
+appropriately.
+
 ## Sunrise Workbench
 
 Provisioning the IIWA arm must be done from Sunrise Workbench.
@@ -76,7 +82,8 @@ state, and report the IIWA status via LCM.  If no LCM control messages
 are received, the arm will be in a "limp" state where it can be moved
 externally subject to the configured impedence force (hardcoded in the
 Java application).  Once it receives a command via LCM, that position
-will be commanded until the next LCM position is received.
+(and optionally torque) will be commanded until the next LCM position
+is received.
 
 An application wishing to control the arm should listen to LCM for
 status updates and command the joints appropriately in response.
