@@ -1,7 +1,6 @@
 [submodule "externals/drake"]
 	path = externals/drake
-	url = https://github.com/sammy-tri/drake.git
-	branch = iiwa_lcm
+	url = https://github.com/RobotLocomotion/drake.git
 [submodule "externals/kuka-fri"]
 	path = externals/kuka-fri
 	url = git@github.com:ToyotaResearchInstitute/kuka-fri.git
