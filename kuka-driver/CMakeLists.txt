@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 2.8.5)
 project(kuka-driver)
 
-include (../externals/cmake/lcmtypes.cmake)
+
 include (../externals/cmake/pods.cmake)
+pods_find_pkg_config(lcm)
+
+include (../externals/cmake/lcmtypes.cmake)
 add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_command.lcm)
 add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_status.lcm)
 lcmtypes_build()

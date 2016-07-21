@@ -7,3 +7,6 @@
 [submodule "externals/cmake"]
 	path = externals/cmake
 	url = https://github.com/RobotLocomotion/cmake.git
+[submodule "externals/lcm"]
+	path = externals/lcm
+	url = https://github.com/lcm-proj/lcm.git

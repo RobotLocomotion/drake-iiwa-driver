@@ -1,11 +1,30 @@
 cmake_minimum_required(VERSION 2.8.5)
 project(drake-kuka-driver)
 
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}" CACHE STRING
+    "Prefix for installation of sub-packages (note: required during build!)" FORCE)
+endif()
+
+message(STATUS CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX})
+
+set(COMMON_CMAKE_ARGS
+  CMAKE_GENERATOR ${CMAKE_GENERATOR}
+  CMAKE_ARGS
+  -DCMAKE_INSTALL_PREFIX:PATH=${CMAKE_INSTALL_PREFIX}
+  -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE})
+
+set(cmake_CONFIGURE_COMMAND "true")
+set(cmake_BUILD_COMMAND "true")
+set(cmake_INSTALL_COMMAND "true")
 # We'll manually build the subset of drake we want...
-set(drake_CONFIGURE_COMMANND "")
-set(drake_BUILD_COMMANND "")
+set(drake_CONFIGURE_COMMAND "true")
+set(drake_BUILD_COMMAND "true")
+set(drake_INSTALL_COMMAND "true")
+set(kuka-fri_CONFIGURE_COMMAND "true")
 set(kuka-fri_BUILD_COMMAND make -C build/GNUMake)
-set(EXTERNAL_PROJECTS cmake drake kuka-fri)
+set(kuka-fri_INSTALL_COMMAND "true")
+set(EXTERNAL_PROJECTS cmake drake kuka-fri lcm)
 
 include(ExternalProject)
 find_package(Git REQUIRED)
@@ -27,15 +46,23 @@ foreach(proj ${EXTERNAL_PROJECTS})
     # In-source build for non-CMake projects.
     set(${proj}_BINARY_DIR "${${proj}_SOURCE_DIR}")
   endif()
+  foreach(c CONFIGURE BUILD INSTALL)
+    if(DEFINED ${proj}_${c}_COMMAND)
+      set(maybe_${c}_COMMAND ${c}_COMMAND ${${proj}_${c}_COMMAND})
+    else()
+      set(maybe_${c}_COMMAND "")
+    endif()
+  endforeach()
   ExternalProject_Add(${proj}
     SOURCE_DIR ${${proj}_SOURCE_DIR}
     BINARY_DIR ${${proj}_BINARY_DIR}
     DOWNLOAD_COMMAND ${${proj}_DOWNLOAD_COMMAND}
     DOWNLOAD_DIR ${CMAKE_CURRENT_SOURCE_DIR}
     UPDATE_COMMAND ""
-    CONFIGURE_COMMAND ""
-    BUILD_COMMAND "${${proj}_BUILD_COMMAND}"
-    INSTALL_COMMAND ""
+    ${COMMON_CMAKE_ARGS}
+    ${maybe_CONFIGURE_COMMAND}
+    ${maybe_BUILD_COMMAND}
+    ${maybe_INSTALL_COMMAND}
     )
 endforeach()
 
