@@ -64,26 +64,23 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 
 ## C++ driver
 
-TODO(sam.creasey) Update the Drake external to point to master once
-the needed changes are integrated.
-
-The computer running Sunrise Workbench must be configured with an
-address which can communicate with 192.170.10.2/24, and which is
-connected to the KONI port.  KUKA recommends directly attaching the
+Once Sunrise Workbench is provisioned, you'll need to configure the
+system which will communicate directly with the KONI interface.  This
+system must be configured for the IP address 192.170.10.200 (netmask
+/24, or 255.255.255.0). KUKA recommends directly attaching the
 computer to the KONI port instead of using a switch.
 
-Once Sunrise Workbench is provisioned, you'll need to build the local
-interface which communicates with the iiwa arm using FRI, and with the
-controlling application using LCM.  Compiling this project will output
-a single program in the build directory called "kuka_driver".  Running
-it with no arguments will connect to the IIWA at it's default address
-and port (192.170.10.2, port 30200), negotiate LCM into the command
-state, and report the IIWA status via LCM.  If no LCM control messages
-are received, the arm will be in a "limp" state where it can be moved
-externally subject to the configured impedence force (hardcoded in the
-Java application).  Once it receives a command via LCM, that position
-(and optionally torque) will be commanded until the next LCM position
-is received.
+Next, build the driver program to communicate with the iiwa arm using
+FRI, and with the controlling application using LCM.  Compiling this
+project will output a single program in the build directory called
+"kuka_driver".  Running it with no arguments will connect to the IIWA
+at it's default address and port (192.170.10.2, port 30200), negotiate
+LCM into the command state, and report the IIWA status via LCM.  If no
+LCM control messages are received, the arm will be in a "limp" state
+where it can be moved externally subject to the configured impedence
+force (hardcoded in the Java application).  Once it receives a command
+via LCM, that position (and optionally torque) will be commanded until
+the next LCM position is received.
 
 An application wishing to control the arm should listen to LCM for
 status updates and command the joints appropriately in response.
