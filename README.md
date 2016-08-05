@@ -70,6 +70,10 @@ system must be configured for the IP address 192.170.10.200 (netmask
 /24, or 255.255.255.0). KUKA recommends directly attaching the
 computer to the KONI port instead of using a switch.
 
+On the SmartPad, turn the key switch, and choose the "AUT" mode, then turn
+the key switch back. Choose either "DrakeFRITorqueDriver" or "DrakeFRIPositionDriver"
+from "Application". Press the green "Play" button on the left sidebar of the SmartPad.
+
 Next, build the driver program to communicate with the iiwa arm using
 FRI, and with the controlling application using LCM.  Compiling this
 project will output a single program in the build directory called
