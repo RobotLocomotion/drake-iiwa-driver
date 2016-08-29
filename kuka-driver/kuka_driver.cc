@@ -66,8 +66,22 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
                              KUKA::FRI::ESessionState newState) {
     KUKA::FRI::LBRClient::onStateChange(oldState, newState);
 
-    std::cerr << "onStateChange: old " << oldState
+    const KUKA::FRI::LBRState& state = robotState();
+    const uint64_t time = state.getTimestampSec() * 1e3 +
+        state.getTimestampNanoSec() / 1e6;
+    std::cerr << "onStateChange ( " << time << "): old " << oldState
               << " new " << newState << std::endl;
+
+    std::cerr << "onStateChange ( " << time
+              << "): quality " << state.getConnectionQuality()
+              << " safety " << state.getSafetyState()
+              << " oper " << state.getOperationMode()
+              << " drive " << state.getDriveState()
+              << " control " << state.getControlMode()
+              << " command " << state.getClientCommandMode()
+              << " overlay " << state.getOverlayType()
+              << std::endl;
+
   }
 
   virtual void monitor() {
