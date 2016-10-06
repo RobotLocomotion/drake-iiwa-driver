@@ -1,4 +1,4 @@
-# drake-kuka-driver
+# drake-iiwa-driver
 
 This repository contains the application code used to communicate with
 the KUKA iiwa are from Drake.  Communicating with the arm requires two
