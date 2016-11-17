@@ -33,7 +33,7 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
   KukaLCMClient() {
     // Use -1 as a sentinal to indicate that no status has been
     // sent (or received from the robot).
-    lcm_status_.timestamp = -1;
+    lcm_status_.utime = -1;
     lcm_status_.num_joints = num_joints_;
     lcm_status_.joint_position_measured.resize(num_joints_);
     lcm_status_.joint_position_commanded.resize(num_joints_);
@@ -44,7 +44,7 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
 
     // Use -1 as a sentinal to indicate that no command has been
     // received.
-    lcm_command_.timestamp = -1;
+    lcm_command_.utime = -1;
 
     // Joint limits derived from visual inspection of KUKA controller
     // output display.  Values in +/- degrees from center.
@@ -67,8 +67,8 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     KUKA::FRI::LBRClient::onStateChange(oldState, newState);
 
     const KUKA::FRI::LBRState& state = robotState();
-    const uint64_t time = state.getTimestampSec() * 1e3 +
-        state.getTimestampNanoSec() / 1e6;
+    const uint64_t time = state.getTimestampSec() * 1e6 +
+        state.getTimestampNanoSec() / 1e3;
     std::cerr << "onStateChange ( " << time << "): old " << oldState
               << " new " << newState << std::endl;
 
@@ -104,12 +104,12 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
   virtual void command() {
     PublishStateUpdate();
 
-    if (lcm_status_.timestamp == -1) {
+    if (lcm_status_.utime == -1) {
       return;
     }
 
     double pos[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
-    if (lcm_command_.timestamp == -1) {
+    if (lcm_command_.utime == -1) {
       // No command received, just command the current position.
       memcpy(pos, lcm_status_.joint_position_measured.data(),
              num_joints_ * sizeof(double));
@@ -125,7 +125,7 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     // we are.
     if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
       double torque[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
-      if (lcm_command_.timestamp != -1) {
+      if (lcm_command_.utime != -1) {
         if (lcm_command_.num_torques != num_joints_) {
           throw std::runtime_error(
               "No torque values specified (or incorrect number) "
@@ -137,7 +137,7 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
       // TODO(sam.creasey): Is there a sensible torque limit to apply here?
       robotCommand().setTorque(torque);
     } else {
-      if (lcm_command_.timestamp != -1 && lcm_command_.num_torques != 0) {
+      if (lcm_command_.utime != -1 && lcm_command_.num_torques != 0) {
         throw std::runtime_error(
             "Torque values specified when not in torque command mode.");
       }
@@ -162,8 +162,8 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
   void PublishStateUpdate() {
     const KUKA::FRI::LBRState& state = robotState();
 
-    lcm_status_.timestamp = state.getTimestampSec() * 1e3 +
-        state.getTimestampNanoSec() / 1e6;
+    lcm_status_.utime = state.getTimestampSec() * 1e6 +
+        state.getTimestampNanoSec() / 1e3;
     std::memcpy(lcm_status_.joint_position_measured.data(),
                 state.getMeasuredJointPosition(), num_joints_ * sizeof(double));
     std::memcpy(lcm_status_.joint_position_commanded.data(),
