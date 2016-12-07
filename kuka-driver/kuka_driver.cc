@@ -69,6 +69,15 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     const KUKA::FRI::LBRState& state = robotState();
     const uint64_t time = state.getTimestampSec() * 1e6 +
         state.getTimestampNanoSec() / 1e3;
+
+    if (newState == KUKA::FRI::COMMANDING_ACTIVE) {
+      joint_position_when_command_entered_.resize(num_joints_, 0.);
+      std::memcpy(joint_position_when_command_entered_.data(),
+                  state.getMeasuredJointPosition(),
+                  num_joints_ * sizeof(double));
+      lcm_command_.utime = -1;
+    }
+
     std::cerr << "onStateChange ( " << time << "): old " << oldState
               << " new " << newState << std::endl;
 
@@ -110,8 +119,10 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
 
     double pos[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
     if (lcm_command_.utime == -1) {
-      // No command received, just command the current position.
-      memcpy(pos, lcm_status_.joint_position_measured.data(),
+      // No command received, just command the position when we
+      // entered command state.
+      assert(joint_position_when_command_entered_.size() == num_joints_);
+      memcpy(pos, joint_position_when_command_entered_.data(),
              num_joints_ * sizeof(double));
     } else {
       assert(lcm_command_.num_joints == num_joints_);
@@ -193,6 +204,9 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
   lcmt_iiwa_status lcm_status_;
   lcmt_iiwa_command lcm_command_;
   std::vector<double> joint_limits_;
+  // What was the joint position when we entered command state?
+  // (provided so that we can keep holding that position).
+  std::vector<double> joint_position_when_command_entered_;
 };
 
 int do_main(int argc, const char* argv[]) {

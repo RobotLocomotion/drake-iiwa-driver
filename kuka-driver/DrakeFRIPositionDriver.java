@@ -58,10 +58,6 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
         getLogger().info("FRI connection established.");
         FRIJointOverlay jointOverlay = new FRIJointOverlay(friSession);
 
-        // TODO(sam.creasey) It's probably not necessary to recenter
-        // every time we reconnect.
-        _lbr.move(ptp(0., 0., 0., 0., 0., 0., 0.));
-
         // TODO(sam.creasey) Neither the selection of
         // JointImpedenceControlMode, nor the particular impedence
         // values, nor the damping values, have actually been
