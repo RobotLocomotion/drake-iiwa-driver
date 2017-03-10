@@ -21,7 +21,11 @@ namespace examples {
 namespace kuka_iiwa_arm {
 namespace {
 
-const char* lcm_status_channel = "IIWA_STATUS";
+#define STATUS_CHANNEL_SUFFIX "_1"
+#define JOINT_INDEX_OFFSET 0
+#define DEFAULT_PORT 30200
+
+const char* lcm_status_channel = "IIWA_STATUS" STATUS_CHANNEL_SUFFIX;
 const char* lcm_command_channel = "IIWA_COMMAND";
 
 double ToRadians(double degrees) {
@@ -125,8 +129,8 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
       memcpy(pos, joint_position_when_command_entered_.data(),
              num_joints_ * sizeof(double));
     } else {
-      assert(lcm_command_.num_joints == num_joints_);
-      memcpy(pos, lcm_command_.joint_position.data(),
+      assert(lcm_command_.num_joints == 2*num_joints_);
+      memcpy(pos, lcm_command_.joint_position.data()+JOINT_INDEX_OFFSET,
              num_joints_ * sizeof(double));
     }
     ApplyJointLimits(pos);
@@ -137,12 +141,12 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
       double torque[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
       if (lcm_command_.utime != -1) {
-        if (lcm_command_.num_torques != num_joints_) {
+        if (lcm_command_.num_torques != 2*num_joints_) {
           throw std::runtime_error(
               "No torque values specified (or incorrect number) "
               "while in torque command mode.");
         }
-        memcpy(torque, lcm_command_.joint_torque.data(),
+        memcpy(torque, lcm_command_.joint_torque.data()+JOINT_INDEX_OFFSET,
                num_joints_ * sizeof(double));
       }
       // TODO(sam.creasey): Is there a sensible torque limit to apply here?
@@ -215,7 +219,8 @@ int do_main(int argc, const char* argv[]) {
   KUKA::FRI::ClientApplication app(connection, client);
 
   // TODO(sam.creasey) make host/port configurable
-  const int default_port = 30200;
+  const int default_port = DEFAULT_PORT;
+  printf("listening on port: %d\n", default_port);
   app.connect(default_port, NULL);
 
   bool success = true;
