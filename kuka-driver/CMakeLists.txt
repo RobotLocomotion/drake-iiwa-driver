@@ -1,18 +1,39 @@
-cmake_minimum_required(VERSION 2.8.5)
-project(kuka-driver)
+# Find LCM
+find_package(lcm REQUIRED)
 
+# add custom commands to copy the kuka-fri source code over to the
+# build dir and compile it
+set(fri_client_source ${CMAKE_SOURCE_DIR}/kuka-fri)
+set(fri_client_build ${CMAKE_BINARY_DIR}/kuka-fri-build)
+set(fri_client_makefile ${fri_client_build}/build/GNUMake/Makefile)
+set(fri_client_library ${fri_client_build}/lib/libFRIClient.a)
 
-include (../externals/cmake/pods.cmake)
-pods_find_pkg_config(lcm)
+# copy kuka-fri source
+add_custom_command(OUTPUT ${fri_client_makefile}
+  COMMAND ${CMAKE_COMMAND} -E copy_directory ${fri_client_source} ${fri_client_build}
+  COMMENT "copying FRIClient source code to build dir")
 
-include (../externals/cmake/lcmtypes.cmake)
-add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_command.lcm)
-add_lcmtype(../externals/drake/drake/lcmtypes/lcmt_iiwa_status.lcm)
-lcmtypes_build()
+# compile kuka-fri source
+add_custom_command(OUTPUT ${fri_client_library}
+  COMMAND make
+  WORKING_DIRECTORY ${fri_client_build}/build/GNUMake
+  DEPENDS ${fri_client_makefile}
+  COMMENT "building FRIClient")
 
-include_directories(../externals/kuka-fri/include)
-add_executable(kuka_driver kuka_driver.cc)
-target_link_libraries(kuka_driver "-L${PROJECT_SOURCE_DIR}/../externals/kuka-fri/lib"
-  "-lFRIClient")
-add_dependencies(kuka_driver kuka_driver_lcmtypes)
-pods_use_pkg_config_packages(kuka_driver lcm)
+# add custom target for FRIClient library
+add_custom_target(fri-client DEPENDS ${fri_client_library})
+
+# add include dir for FRIClient headers
+include_directories(${fri_client_build}/include)
+
+# build the lcm driver that uses FRIClient
+set(driver_name kuka_driver)
+add_executable(${driver_name} kuka_driver.cc)
+add_dependencies(${driver_name} fri-client)
+target_link_libraries(${driver_name} ${fri_client_library} lcm)
+
+# install the lcm driver
+install(TARGETS ${driver_name}
+    RUNTIME DESTINATION bin
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib)
