@@ -66,6 +66,9 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 
 ## C++ driver
 
+**The build for the C++ driver depends on lcm and drake-lcmtypes, so
+  it must be compiled as a component in a superbuild.**
+
 Once Sunrise Workbench is provisioned, you'll need to configure the
 system which will communicate directly with the KONI interface.  This
 system must be configured for the IP address 192.170.10.200 (netmask
