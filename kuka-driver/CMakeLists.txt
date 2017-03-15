@@ -1,5 +1,6 @@
 # Find LCM
 find_package(lcm REQUIRED)
+find_package(gflags REQUIRED)
 
 # add custom commands to copy the kuka-fri source code over to the
 # build dir and compile it
@@ -30,7 +31,7 @@ include_directories(${fri_client_build}/include)
 set(driver_name kuka_driver)
 add_executable(${driver_name} kuka_driver.cc)
 add_dependencies(${driver_name} fri-client)
-target_link_libraries(${driver_name} ${fri_client_library} lcm)
+target_link_libraries(${driver_name} ${fri_client_library} lcm gflags)
 
 # install the lcm driver
 install(TARGETS ${driver_name}

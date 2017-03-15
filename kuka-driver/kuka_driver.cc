@@ -7,6 +7,7 @@
 #include <limits>
 #include <stdexcept>
 
+#include <gflags/gflags.h>
 #include <lcm/lcm-cpp.hpp>
 
 #include "friClientApplication.h"
@@ -16,17 +17,27 @@
 #include "lcmtypes/drake/lcmt_iiwa_command.hpp"
 #include "lcmtypes/drake/lcmt_iiwa_status.hpp"
 
-namespace drake {
-namespace examples {
-namespace kuka_iiwa_arm {
+using drake::lcmt_iiwa_command;
+using drake::lcmt_iiwa_status;
+
 namespace {
 
-const char* lcm_status_channel = "IIWA_STATUS";
-const char* lcm_command_channel = "IIWA_COMMAND";
+const int kDefaultPort = 30200;
+const char* kLcmStatusChannel = "IIWA_STATUS";
+const char* kLcmCommandChannel = "IIWA_COMMAND";
 
 double ToRadians(double degrees) {
   return degrees * M_PI / 180.;
 }
+}  // namespace
+
+DEFINE_int32(fri_port, kDefaultPort, "UDP port for FRI messages");
+DEFINE_string(lcm_command_channel, kLcmCommandChannel,
+              "Channel to receive LCM command messages on");
+DEFINE_string(lcm_status_channel, kLcmStatusChannel,
+              "Channel to send LCM status messages on");
+
+namespace kuka_driver {
 
 class KukaLCMClient : public KUKA::FRI::LBRClient {
  public:
@@ -56,7 +67,7 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     joint_limits_.push_back(ToRadians(120));
     joint_limits_.push_back(ToRadians(175));
 
-    lcm_.subscribe(lcm_command_channel,
+    lcm_.subscribe(FLAGS_lcm_command_channel,
                    &KukaLCMClient::HandleCommandMessage, this);
   }
 
@@ -193,7 +204,7 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
                 state.getCommandedTorque(), num_joints_ * sizeof(double));
     std::memcpy(lcm_status_.joint_torque_external.data(),
                 state.getExternalTorque(), num_joints_ * sizeof(double));
-    lcm_.publish(lcm_status_channel, &lcm_status_);
+    lcm_.publish(FLAGS_lcm_status_channel, &lcm_status_);
     // Also poll for new messages.
     lcm_.handleTimeout(0);
   }
@@ -209,14 +220,11 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
   std::vector<double> joint_position_when_command_entered_;
 };
 
-int do_main(int argc, const char* argv[]) {
+int do_main() {
   KUKA::FRI::UdpConnection connection;
   KukaLCMClient client;
   KUKA::FRI::ClientApplication app(connection, client);
-
-  // TODO(sam.creasey) make host/port configurable
-  const int default_port = 30200;
-  app.connect(default_port, NULL);
+  app.connect(FLAGS_fri_port, NULL);
 
   bool success = true;
   while (success) {
@@ -227,11 +235,9 @@ int do_main(int argc, const char* argv[]) {
   return 0;
 }
 
-} // namespace
-} // namespace kuka_iiwa_arm
-} // namespace examples
-} // namespace drake
+} // namespace kuka_driver
 
-int main(int argc, const char* argv[]) {
-  return drake::examples::kuka_iiwa_arm::do_main(argc, argv);
+int main(int argc, char** argv) {
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
+  return kuka_driver::do_main();
 }
