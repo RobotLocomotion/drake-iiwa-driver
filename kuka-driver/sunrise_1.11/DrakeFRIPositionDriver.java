@@ -13,7 +13,7 @@ import com.kuka.roboticsAPI.controllerModel.Controller;
 import com.kuka.roboticsAPI.deviceModel.LBR;
 import com.kuka.roboticsAPI.executionModel.CommandInvalidException;
 import com.kuka.roboticsAPI.motionModel.PositionHold;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.JointImpedanceControlMode;
+import com.kuka.roboticsAPI.motionModel.controlModeModel.PositionControlMode;
 
 /**
  * Creates a FRI Session.
@@ -23,6 +23,7 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
     private Controller _lbrController;
     private LBR _lbr;
     private String _clientName;
+    private int _clientPort;
 
     @Override
     public void initialize()
@@ -33,10 +34,12 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
         // *** change next line to the FRIClient's IP address                 ***
         // **********************************************************************
         _clientName = "192.170.10.200";
+        _clientPort = 30200;
     }
 
     private void doFRISession(FRIConfiguration friConfiguration) {
-        getLogger().info("Creating FRI connection to " + friConfiguration.getHostName());
+    	getLogger().info("Creating FRI connection to " + friConfiguration.getHostName() +
+    			":" + friConfiguration.getPortOnRemote());
         getLogger().info("SendPeriod: " + friConfiguration.getSendPeriodMilliSec() + "ms |"
                 + " ReceiveMultiplier: " + friConfiguration.getReceiveMultiplier());
 
@@ -56,13 +59,7 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
         getLogger().info("FRI connection established.");
         FRIJointOverlay jointOverlay = new FRIJointOverlay(friSession);
 
-        // TODO(sam.creasey) Neither the selection of
-        // JointImpedenceControlMode, nor the particular impedence
-        // values, nor the damping values, have actually been
-        // calibrated (or really thought out at all).
-        JointImpedanceControlMode ctrMode =
-            new JointImpedanceControlMode(500, 500, 500, 500, 500, 500, 500);
-        ctrMode.setDamping(.7,.7,.7,.7,.7,.7,.7);
+        PositionControlMode ctrMode = new PositionControlMode();
         PositionHold posHold = new PositionHold(ctrMode, -1, TimeUnit.SECONDS);
 
         try {
@@ -81,6 +78,7 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
         // configure and start FRI session
         FRIConfiguration friConfiguration = FRIConfiguration.createRemoteConfiguration(_lbr, _clientName);
         friConfiguration.setSendPeriodMilliSec(5);
+        friConfiguration.setPortOnRemote(_clientPort);
         while (true) {
           doFRISession(friConfiguration);
         }

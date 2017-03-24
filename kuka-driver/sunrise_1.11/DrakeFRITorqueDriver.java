@@ -14,7 +14,7 @@ import com.kuka.roboticsAPI.controllerModel.Controller;
 import com.kuka.roboticsAPI.deviceModel.LBR;
 import com.kuka.roboticsAPI.executionModel.CommandInvalidException;
 import com.kuka.roboticsAPI.motionModel.PositionHold;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.JointImpedanceControlMode;
+import com.kuka.roboticsAPI.motionModel.controlModeModel.PositionControlMode;
 
 /**
  * Creates a FRI Session.
@@ -24,6 +24,7 @@ public class DrakeFRITorqueDriver extends RoboticsAPIApplication
     private Controller _lbrController;
     private LBR _lbr;
     private String _clientName;
+    private int _clientPort;
 
     @Override
     public void initialize()
@@ -34,11 +35,13 @@ public class DrakeFRITorqueDriver extends RoboticsAPIApplication
         // *** change next line to the FRIClient's IP address                 ***
         // **********************************************************************
         _clientName = "192.170.10.200";
+        _clientPort = 30200;
     }
 
     private void doFRISession(FRIConfiguration friConfiguration) {
-        getLogger().info("Creating FRI connection to " + friConfiguration.getHostName());
-        getLogger().info("SendPeriod: " + friConfiguration.getSendPeriodMilliSec() + "ms |"
+    	getLogger().info("Creating FRI connection to " + friConfiguration.getHostName() +
+    			":" + friConfiguration.getPortOnRemote());
+    	getLogger().info("SendPeriod: " + friConfiguration.getSendPeriodMilliSec() + "ms |"
                 + " ReceiveMultiplier: " + friConfiguration.getReceiveMultiplier());
 
         FRISession friSession = new FRISession(friConfiguration);
@@ -58,12 +61,7 @@ public class DrakeFRITorqueDriver extends RoboticsAPIApplication
         FRIJointOverlay jointOverlay = new FRIJointOverlay(
             friSession, ClientCommandMode.TORQUE);
 
-
-        // Since we want to control the arm torque directly, impedence
-        // control and damping are unlikely to help anything.
-        JointImpedanceControlMode ctrMode =
-            new JointImpedanceControlMode(0, 0, 0, 0, 0, 0, 0);
-        ctrMode.setDamping(.0,.0,.0,.0,.0,.0,.0);
+        PositionControlMode ctrMode = new PositionControlMode();
         PositionHold posHold = new PositionHold(ctrMode, -1, TimeUnit.SECONDS);
 
         try {
@@ -82,6 +80,7 @@ public class DrakeFRITorqueDriver extends RoboticsAPIApplication
         // configure and start FRI session
         FRIConfiguration friConfiguration = FRIConfiguration.createRemoteConfiguration(_lbr, _clientName);
         friConfiguration.setSendPeriodMilliSec(5);
+        friConfiguration.setPortOnRemote(_clientPort);
         while (true) {
           doFRISession(friConfiguration);
         }
