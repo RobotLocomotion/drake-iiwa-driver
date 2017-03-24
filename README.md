@@ -54,7 +54,7 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
    * Uncheck row 3 "Safety Stop"
 
  * Copy the Java source code for DrakeFRIPositionDriver and DrakeFRITorqueDriver.
-  * KUKA changed the spelling of the Java FRI interface as of Sunrise OS version 1.11.  The appropriate sources files can be found in either kuka-driver/sunrise_1.7 or kuka-driver/sunrise_1.11
+  * KUKA changed the spelling of the Java FRI interface as of Sunrise OS version 1.11.  The appropriate sources files can be found in either kuka-driver/sunrise_1.7 or kuka-driver/sunrise_1.11  (NOTE: The sunrise_1.7 version is no longer actively tested, as I don't have any cabinets still running the older version of the software).
   * Copy DrakeFRIPositionDriver.java and DrakeFRITorqueDriver to DrakeFRIDriver/src/drake_fri (make sure Sunrise sees the update, you may need to import the files into the project).  You can remove any exising DrakeFRIDriver.
 
  * In "Package Explorer", select StationSetup.cat
