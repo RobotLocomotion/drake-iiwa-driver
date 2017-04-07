@@ -24,7 +24,7 @@ appropriately.
 Provisioning the IIWA arm must be done from Sunrise Workbench.
 
 The computer running Sunrise Workbench must be configured with an
-address which can communicate with 172.13.1.47/16, and which is
+address which can communicate with 172.31.1.147/16, and which is
 connected to the X66 port.
 
 TODO(sam.creasey) Can I just zip up a project/workspace?
