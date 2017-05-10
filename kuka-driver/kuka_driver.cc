@@ -1,4 +1,6 @@
 
+#include "poll.h"
+
 #include <cassert>
 #include <cmath>
 #include <cstring>
@@ -6,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 #include <gflags/gflags.h>
 #include <lcm/lcm-cpp.hpp>
@@ -22,6 +25,7 @@ using drake::lcmt_iiwa_status;
 
 namespace {
 
+const int kNumJoints = 7;
 const int kDefaultPort = 30200;
 const char* kLcmStatusChannel = "IIWA_STATUS";
 const char* kLcmCommandChannel = "IIWA_COMMAND";
@@ -31,7 +35,8 @@ double ToRadians(double degrees) {
 }
 }  // namespace
 
-DEFINE_int32(fri_port, kDefaultPort, "UDP port for FRI messages");
+DEFINE_int32(fri_port, kDefaultPort, "First UDP port for FRI messages");
+DEFINE_int32(num_robots, 1, "Number of robots to control");
 DEFINE_string(lcm_command_channel, kLcmCommandChannel,
               "Channel to receive LCM command messages on");
 DEFINE_string(lcm_status_channel, kLcmStatusChannel,
@@ -39,9 +44,11 @@ DEFINE_string(lcm_status_channel, kLcmStatusChannel,
 
 namespace kuka_driver {
 
-class KukaLCMClient : public KUKA::FRI::LBRClient {
+class KukaLCMClient  {
  public:
-  KukaLCMClient() {
+  explicit KukaLCMClient(int num_robots)
+      : num_joints_(num_robots * kNumJoints) {
+
     // Use -1 as a sentinal to indicate that no status has been
     // sent (or received from the robot).
     lcm_status_.utime = -1;
@@ -57,6 +64,98 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     // received.
     lcm_command_.utime = -1;
 
+    lcm_.subscribe(FLAGS_lcm_command_channel,
+                   &KukaLCMClient::HandleCommandMessage, this);
+  }
+
+  void UpdateRobotState(int robot_id, const KUKA::FRI::LBRState& state) {
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    // The choice of robot id 0 for the timestamp is arbitrary.
+    if (robot_id == 0) {
+      lcm_status_.utime = state.getTimestampSec() * 1e6 +
+          state.getTimestampNanoSec() / 1e3;
+    }
+
+    std::memcpy(lcm_status_.joint_position_measured.data() + joint_offset,
+                state.getMeasuredJointPosition(), kNumJoints * sizeof(double));
+    std::memcpy(lcm_status_.joint_position_commanded.data() + joint_offset,
+                state.getCommandedJointPosition(), kNumJoints * sizeof(double));
+    if (state.getIpoJointPosition() != NULL) {
+      std::memcpy(lcm_status_.joint_position_ipo.data() + joint_offset,
+                  state.getIpoJointPosition(), kNumJoints * sizeof(double));
+    } else {
+      for (int i = joint_offset; i < joint_offset + kNumJoints; i++) {
+        lcm_status_.joint_position_ipo[i] =
+            std::numeric_limits<double>::quiet_NaN();
+      }
+    }
+    std::memcpy(lcm_status_.joint_torque_measured.data() + joint_offset,
+                state.getMeasuredTorque(), kNumJoints * sizeof(double));
+    std::memcpy(lcm_status_.joint_torque_commanded.data() + joint_offset,
+                state.getCommandedTorque(), kNumJoints * sizeof(double));
+    std::memcpy(lcm_status_.joint_torque_external.data() + joint_offset,
+                state.getExternalTorque(), kNumJoints * sizeof(double));
+  }
+
+  /// @return true if valid command data was present, or false if no
+  /// command is available (in which case the array is not modified).
+  bool GetRobotPosition(int robot_id, double* pos) const {
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    if (lcm_command_.utime == -1) {
+      return false;
+    }
+
+    assert(lcm_command_.num_joints >= num_joints_);
+    memcpy(pos, lcm_command_.joint_position.data() + joint_offset,
+           kNumJoints * sizeof(double));
+    return true;
+  }
+
+  /// @return true if valid command data was present, or false if no
+  /// command is available (in which case the array is not modified).
+  bool GetRobotTorque(int robot_id, double* torque) const {
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    if (lcm_command_.utime == -1) {
+      return false;
+    }
+
+    assert(lcm_command_.num_torques >= num_joints_);
+    memcpy(torque, lcm_command_.joint_torque.data() + joint_offset,
+           kNumJoints * sizeof(double));
+    return true;
+  }
+
+  void PublishStateUpdate() {
+    lcm_.publish(FLAGS_lcm_status_channel, &lcm_status_);
+    // Also poll for new messages.
+    lcm_.handleTimeout(0);
+  }
+
+ private:
+  void HandleCommandMessage(const lcm::ReceiveBuffer* rbuf,
+                            const std::string& chan,
+                            const lcmt_iiwa_command* command) {
+    lcm_command_ = *command;
+  }
+
+  const int num_joints_;
+  lcm::LCM lcm_;
+  lcmt_iiwa_status lcm_status_;
+  lcmt_iiwa_command lcm_command_;
+
+};
+
+class KukaFRIClient : public KUKA::FRI::LBRClient {
+ public:
+  KukaFRIClient(int robot_id, KukaLCMClient* lcm_client)
+      : robot_id_(robot_id),
+        lcm_client_(lcm_client) {
     // Joint limits derived from visual inspection of KUKA controller
     // output display.  Values in +/- degrees from center.
     joint_limits_.push_back(ToRadians(170));
@@ -66,12 +165,9 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     joint_limits_.push_back(ToRadians(170));
     joint_limits_.push_back(ToRadians(120));
     joint_limits_.push_back(ToRadians(175));
-
-    lcm_.subscribe(FLAGS_lcm_command_channel,
-                   &KukaLCMClient::HandleCommandMessage, this);
   }
 
-  ~KukaLCMClient() {}
+  ~KukaFRIClient() {}
 
   virtual void onStateChange(KUKA::FRI::ESessionState oldState,
                              KUKA::FRI::ESessionState newState) {
@@ -82,11 +178,11 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
         state.getTimestampNanoSec() / 1e3;
 
     if (newState == KUKA::FRI::COMMANDING_ACTIVE) {
-      joint_position_when_command_entered_.resize(num_joints_, 0.);
+      joint_position_when_command_entered_.resize(kNumJoints, 0.);
       std::memcpy(joint_position_when_command_entered_.data(),
                   state.getMeasuredJointPosition(),
-                  num_joints_ * sizeof(double));
-      lcm_command_.utime = -1;
+                  kNumJoints * sizeof(double));
+      //lcm_command_.utime = -1;
     }
 
     std::cerr << "onStateChange ( " << time << "): old " << oldState
@@ -106,8 +202,8 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
 
   virtual void monitor() {
     KUKA::FRI::LBRClient::monitor();
-    PublishStateUpdate();
-  }
+    lcm_client_->UpdateRobotState(robot_id_, robotState());
+ }
 
   virtual void waitForCommand() {
     KUKA::FRI::LBRClient::waitForCommand();
@@ -115,30 +211,25 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     // The value of the torques sent in waitForCommand doesn't matter,
     // but we have to send something.
     if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
-      double torque[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
+      double torque[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
       robotCommand().setTorque(torque);
     }
 
-    PublishStateUpdate();
+    lcm_client_->UpdateRobotState(robot_id_, robotState());
   }
+
   virtual void command() {
-    PublishStateUpdate();
+    lcm_client_->UpdateRobotState(robot_id_, robotState());
 
-    if (lcm_status_.utime == -1) {
-      return;
-    }
-
-    double pos[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
-    if (lcm_command_.utime == -1) {
+    double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
+    const bool command_valid =
+        lcm_client_->GetRobotPosition(robot_id_, pos);
+    if (!command_valid) {
       // No command received, just command the position when we
       // entered command state.
-      assert(joint_position_when_command_entered_.size() == num_joints_);
+      assert(joint_position_when_command_entered_.size() == kNumJoints);
       memcpy(pos, joint_position_when_command_entered_.data(),
-             num_joints_ * sizeof(double));
-    } else {
-      assert(lcm_command_.num_joints == num_joints_);
-      memcpy(pos, lcm_command_.joint_position.data(),
-             num_joints_ * sizeof(double));
+             kNumJoints * sizeof(double));
     }
     ApplyJointLimits(pos);
     robotCommand().setJointPosition(pos);
@@ -146,74 +237,26 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
     // Check if we're in torque mode, and send torque commands too if
     // we are.
     if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
-      double torque[num_joints_] = { 0., 0., 0., 0., 0., 0., 0.};
-      if (lcm_command_.utime != -1) {
-        if (lcm_command_.num_torques != num_joints_) {
-          throw std::runtime_error(
-              "No torque values specified (or incorrect number) "
-              "while in torque command mode.");
-        }
-        memcpy(torque, lcm_command_.joint_torque.data(),
-               num_joints_ * sizeof(double));
+      double torque[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
+      if (command_valid) {
+        lcm_client_->GetRobotTorque(robot_id_, torque);
       }
       // TODO(sam.creasey): Is there a sensible torque limit to apply here?
       robotCommand().setTorque(torque);
-    } else {
-      if (lcm_command_.utime != -1 && lcm_command_.num_torques != 0) {
-        throw std::runtime_error(
-            "Torque values specified when not in torque command mode.");
-      }
     }
   }
 
  private:
   void ApplyJointLimits(double* pos) const {
       const double joint_tol = ToRadians(5);
-      for (int i = 0; i < num_joints_; i++) {
+      for (int i = 0; i < kNumJoints; i++) {
         pos[i] = std::max(std::min(pos[i], (joint_limits_[i] - joint_tol)),
                           ((-joint_limits_[i]) + joint_tol));
       }
   }
 
-  void HandleCommandMessage(const lcm::ReceiveBuffer* rbuf,
-                            const std::string& chan,
-                            const lcmt_iiwa_command* command) {
-    lcm_command_ = *command;
-  }
-
-  void PublishStateUpdate() {
-    const KUKA::FRI::LBRState& state = robotState();
-
-    lcm_status_.utime = state.getTimestampSec() * 1e6 +
-        state.getTimestampNanoSec() / 1e3;
-    std::memcpy(lcm_status_.joint_position_measured.data(),
-                state.getMeasuredJointPosition(), num_joints_ * sizeof(double));
-    std::memcpy(lcm_status_.joint_position_commanded.data(),
-                state.getCommandedJointPosition(), num_joints_ * sizeof(double));
-    if (state.getIpoJointPosition() != NULL) {
-      std::memcpy(lcm_status_.joint_position_ipo.data(),
-                  state.getIpoJointPosition(), num_joints_ * sizeof(double));
-    } else {
-      lcm_status_.joint_position_ipo.assign(
-          num_joints_, std::numeric_limits<double>::quiet_NaN());
-
-    }
-    std::memcpy(lcm_status_.joint_torque_measured.data(),
-                state.getMeasuredTorque(), num_joints_ * sizeof(double));
-    std::memcpy(lcm_status_.joint_torque_commanded.data(),
-                state.getCommandedTorque(), num_joints_ * sizeof(double));
-    std::memcpy(lcm_status_.joint_torque_external.data(),
-                state.getExternalTorque(), num_joints_ * sizeof(double));
-    lcm_.publish(FLAGS_lcm_status_channel, &lcm_status_);
-    // Also poll for new messages.
-    lcm_.handleTimeout(0);
-  }
-
-  static const int num_joints_ = 7;
-
-  lcm::LCM lcm_;
-  lcmt_iiwa_status lcm_status_;
-  lcmt_iiwa_command lcm_command_;
+  int robot_id_;
+  KukaLCMClient* lcm_client_;
   std::vector<double> joint_limits_;
   // What was the joint position when we entered command state?
   // (provided so that we can keep holding that position).
@@ -221,16 +264,52 @@ class KukaLCMClient : public KUKA::FRI::LBRClient {
 };
 
 int do_main() {
-  KUKA::FRI::UdpConnection connection;
-  KukaLCMClient client;
-  KUKA::FRI::ClientApplication app(connection, client);
-  app.connect(FLAGS_fri_port, NULL);
+  std::vector<KUKA::FRI::UdpConnection> connections;
+  connections.reserve(FLAGS_num_robots);
+  std::vector<KukaFRIClient> clients;
+  clients.reserve(FLAGS_num_robots);
+  std::vector<KUKA::FRI::ClientApplication> apps;
+  apps.reserve(FLAGS_num_robots);
+  KukaLCMClient lcm_client(FLAGS_num_robots);
+  std::vector<struct pollfd> fds(FLAGS_num_robots);
+
+  for (int i = 0; i < FLAGS_num_robots; i++) {
+    connections.emplace_back();
+    clients.emplace_back(i, &lcm_client);
+    apps.emplace_back(connections[i], clients[i]);
+    apps[i].connect(FLAGS_fri_port + i, NULL);
+
+    fds[i].fd = connections[i].udpSock();
+    fds[i].events = POLLIN;
+    fds[i].revents = 0;
+    std::cerr << "Listening for robot " << i
+              << " port " << FLAGS_fri_port + i
+              << std::endl;
+  }
 
   bool success = true;
   while (success) {
-    success = app.step();
+    int result = poll(fds.data(), fds.size(), -1);
+    if (result < 0) {
+      perror("poll failed");
+      break;
+    }
+
+    for (int i = 0; i < FLAGS_num_robots; i++) {
+      if (fds[i].revents != 0) {
+        fds[i].revents = 0;  // TODO(sam.creasey) do I actually need
+                             // to clear that?
+        success = apps[i].step();
+        if (!success) { break; }
+      }
+    }
+    if (!success) { break; }
+    lcm_client.PublishStateUpdate();
   }
-  app.disconnect();
+
+  for (int i = 0; i < FLAGS_num_robots; i++) {
+    apps[i].disconnect();
+  }
 
   return 0;
 }

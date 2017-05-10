@@ -72,24 +72,36 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 Once Sunrise Workbench is provisioned, you'll need to configure the
 system which will communicate directly with the KONI interface.  This
 system must be configured for the IP address 192.170.10.200 (netmask
-/24, or 255.255.255.0). KUKA recommends directly attaching the
-computer to the KONI port instead of using a switch.
+/24, or 255.255.255.0) (this can be changed in the Java applications).
+KUKA recommends directly attaching the computer to the KONI port
+instead of using a switch.  Some network interfaces (particularly some
+Intel models) have issues when cabled directly to the KONI port (problems
+include link flapping up/down repeatedly).
 
-On the SmartPad, turn the key switch, and choose the "AUT" mode, then turn
-the key switch back. Choose either "DrakeFRITorqueDriver" or "DrakeFRIPositionDriver"
-from "Application". Press the green "Play" button on the left sidebar of the SmartPad.
+On the SmartPad, turn the key switch, and choose the "AUT" mode, then
+turn the key switch back. Choose either "DrakeFRITorqueDriver" or
+"DrakeFRIPositionDriver" from "Application". Press the green "Play"
+button on the left sidebar of the SmartPad.
 
 Next, build the driver program to communicate with the iiwa arm using
 FRI, and with the controlling application using LCM.  Compiling this
 project will output a single program in the build directory called
 "kuka_driver".  Running it with no arguments will connect to the IIWA
 at it's default address and port (192.170.10.2, port 30200), negotiate
-LCM into the command state, and report the IIWA status via LCM.  If no
-LCM control messages are received, the arm will be in a "limp" state
-where it can be moved externally subject to the configured impedence
-force (hardcoded in the Java application).  Once it receives a command
-via LCM, that position (and optionally torque) will be commanded until
-the next LCM position is received.
+LCM into the command state, and report the IIWA status via LCM.
+
+This repository is configured with a private git submodule for the
+KUKA FRI source code.  If you do not have access to that repository,
+you will need to install your own version of the FRI source:
+
+```
+cd kuka-fri
+unzip /path/to/your/copy/of/FRI-Client-SDK_Cpp.zip
+patch -p1 < ../fri_udp_connection_file_descriptor.diff
+```
+
+The patch above applies correctly to the FRI 1.7 and 1.11 source.
+Other versions have not been tested.
 
 An application wishing to control the arm should listen to LCM for
 status updates and command the joints appropriately in response.
