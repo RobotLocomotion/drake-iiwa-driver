@@ -1,0 +1,13 @@
+diff --git a/include/friUdpConnection.h b/include/friUdpConnection.h
+index 10eaa8b..ff63f27 100644
+--- a/include/friUdpConnection.h
++++ b/include/friUdpConnection.h
+@@ -114,6 +114,8 @@ namespace FRI
+        */
+       virtual bool send(const char* buffer, int size);
+    
++     int udpSock() const { return _udpSock; }
++
+    private:
+    
+       int _udpSock;                          //!< UDP socket handle

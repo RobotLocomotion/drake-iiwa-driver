@@ -28,6 +28,7 @@ add_custom_target(fri-client DEPENDS ${fri_client_library})
 include_directories(${fri_client_build}/include)
 
 # build the lcm driver that uses FRIClient
+add_definitions(-std=c++11)
 set(driver_name kuka_driver)
 add_executable(${driver_name} kuka_driver.cc)
 add_dependencies(${driver_name} fri-client)
