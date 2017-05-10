@@ -7,8 +7,8 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
-if(NOT EXISTS ${CMAKE_SOURCE_DIR}/kuka-fri/.git)
-  message(FATAL_ERROR "\nThe kuka-fri submodule is not available.\nPlease run: git submodule update --init")
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/kuka-fri/src)
+  message(FATAL_ERROR "\nThe kuka-fri submodule is not available.\nPlease run: git submodule update --init or install the FRI source (see README.md).")
 endif()
 
 add_subdirectory(kuka-driver)
