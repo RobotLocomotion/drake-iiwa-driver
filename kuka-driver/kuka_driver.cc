@@ -17,8 +17,8 @@
 #include "friLBRClient.h"
 #include "friUdpConnection.h"
 
-#include "lcmtypes/drake/lcmt_iiwa_command.hpp"
-#include "lcmtypes/drake/lcmt_iiwa_status.hpp"
+#include "drake/lcmt_iiwa_command.hpp"
+#include "drake/lcmt_iiwa_status.hpp"
 
 using drake::lcmt_iiwa_command;
 using drake::lcmt_iiwa_status;
