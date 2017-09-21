@@ -27,6 +27,18 @@ The computer running Sunrise Workbench must be configured with an
 address which can communicate with 172.31.1.147/16, and which is
 connected to the X66 port.
 
+### Installing Sunrise Connectivity Software
+In order to use FRI to drive the arms additional software must be installed. In the DVD's that were shipped to you their should be one called "Media". It should contain files with names like 0000288631_00_KUKA Sunrise.FRI 1.13_1.13.0_B6_C358496.zip. These are Java packages. In order to use them when developing the Sunrise Workbench Application they must be installed. In kuka speak these are called "software options". In the SunriseWorkbench documentation (1.11) Section 10.5.1 details how to install software options. The basic steps are
+
+  * In dropdown menu **Help->Install new software**
+  * In the rop right of the **Work with** box click **Add**
+  * Click **Archive** and navigate to where the aforementioned zip file is.
+  * Hit **Ok** and then select that software option when it appears with checkbox.
+  * Keep hitting **next** until it is installed.
+  * Make sure to restart SunriseWorkbench when prompted.
+
+### Creating the Java Application
+
 TODO(sam.creasey) Can I just zip up a project/workspace?
 
  * File -> New -> SunriseProject
