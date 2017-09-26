@@ -13,10 +13,14 @@
 #include <gflags/gflags.h>
 #include <lcm/lcm-cpp.hpp>
 
+
+//fri
 #include "friClientApplication.h"
 #include "friLBRClient.h"
 #include "friUdpConnection.h"
 
+
+// drake
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
 
@@ -82,15 +86,14 @@ class KukaLCMClient  {
                 state.getMeasuredJointPosition(), kNumJoints * sizeof(double));
     std::memcpy(lcm_status_.joint_position_commanded.data() + joint_offset,
                 state.getCommandedJointPosition(), kNumJoints * sizeof(double));
-    if (state.getIpoJointPosition() != NULL) {
-      std::memcpy(lcm_status_.joint_position_ipo.data() + joint_offset,
-                  state.getIpoJointPosition(), kNumJoints * sizeof(double));
-    } else {
-      for (int i = joint_offset; i < joint_offset + kNumJoints; i++) {
+
+    // fill with NaN because getIpoJointPosition throws an FRIException if we are
+    // in monitoring mode
+    // TODO (@manuelli): fix this
+    for (int i = joint_offset; i < joint_offset + kNumJoints; i++) {
         lcm_status_.joint_position_ipo[i] =
             std::numeric_limits<double>::quiet_NaN();
       }
-    }
     std::memcpy(lcm_status_.joint_torque_measured.data() + joint_offset,
                 state.getMeasuredTorque(), kNumJoints * sizeof(double));
     std::memcpy(lcm_status_.joint_torque_commanded.data() + joint_offset,
