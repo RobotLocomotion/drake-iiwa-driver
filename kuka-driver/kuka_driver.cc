@@ -13,12 +13,16 @@
 #include <gflags/gflags.h>
 #include <lcm/lcm-cpp.hpp>
 
+
+//fri
 #include "friClientApplication.h"
 #include "friLBRClient.h"
 #include "friUdpConnection.h"
 
-#include "lcmtypes/drake/lcmt_iiwa_command.hpp"
-#include "lcmtypes/drake/lcmt_iiwa_status.hpp"
+
+// drake
+#include "drake/lcmt_iiwa_command.hpp"
+#include "drake/lcmt_iiwa_status.hpp"
 
 using drake::lcmt_iiwa_command;
 using drake::lcmt_iiwa_status;

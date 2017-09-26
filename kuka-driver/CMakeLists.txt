@@ -33,7 +33,7 @@ add_definitions(-std=c++11)
 set(driver_name kuka_driver)
 add_executable(${driver_name} kuka_driver.cc)
 add_dependencies(${driver_name} fri-client)
-target_link_libraries(${driver_name} ${fri_client_library} ${LCM_NAMESPACE}lcm ${gflags_LIBRARIES})
+target_link_libraries(${driver_name} ${fri_client_library} ${LCM_NAMESPACE}lcm ${gflags_LIBRARIES} drake::drake-lcmtypes-cpp)
 
 # install the lcm driver
 install(TARGETS ${driver_name}
