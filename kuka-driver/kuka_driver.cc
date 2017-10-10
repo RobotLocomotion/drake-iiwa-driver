@@ -53,12 +53,13 @@ class KukaLCMClient  {
     // sent (or received from the robot).
     lcm_status_.utime = -1;
     lcm_status_.num_joints = num_joints_;
-    lcm_status_.joint_position_measured.resize(num_joints_);
-    lcm_status_.joint_position_commanded.resize(num_joints_);
-    lcm_status_.joint_position_ipo.resize(num_joints_);
-    lcm_status_.joint_torque_measured.resize(num_joints_);
-    lcm_status_.joint_torque_commanded.resize(num_joints_);
-    lcm_status_.joint_torque_external.resize(num_joints_);
+    lcm_status_.joint_position_measured.resize(num_joints_, 0);
+    lcm_status_.joint_position_commanded.resize(num_joints_, 0);
+    lcm_status_.joint_position_ipo.resize(num_joints_, 0);
+    lcm_status_.joint_velocity_estimated.resize(num_joints_, 0);
+    lcm_status_.joint_torque_measured.resize(num_joints_, 0);
+    lcm_status_.joint_torque_commanded.resize(num_joints_, 0);
+    lcm_status_.joint_torque_external.resize(num_joints_, 0);
 
     // Use -1 as a sentinal to indicate that no command has been
     // received.
