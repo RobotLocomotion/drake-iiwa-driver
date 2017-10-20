@@ -33,12 +33,30 @@ const char* kLcmStatusChannel = "IIWA_STATUS";
 const char* kLcmCommandChannel = "IIWA_COMMAND";
 const double kTimeStep = 0.005;
 const double kJointLimitSafetyMarginDegree = 1;
+const double kJointTorqueSafetyMarginNm = 60;
+const double kJointTorqueSafetyMarginScale[kNumJoints] = {1, 1, 1, 0.5,
+                                                          0.2, 0.2, 0.1};
 
 double ToRadians(double degrees) {
   return degrees * M_PI / 180.;
 }
+
+void PrintVector(const std::vector<double>& array, int start, int length,
+                 std::ostream& out) {
+  const int end = std::min(start + length, static_cast<int>(array.size()));
+  for (int i = start; i < end; i++) {
+    out << array.at(i);
+    if (i != end - 1)
+      out << ", ";
+    else
+      out << "\n";
+  }
+}
+
 }  // namespace
 
+DEFINE_double(ext_trq_limit, kJointTorqueSafetyMarginNm,
+              "Maximal external torque that triggers safety freeze");
 DEFINE_int32(fri_port, kDefaultPort, "First UDP port for FRI messages");
 DEFINE_int32(num_robots, 1, "Number of robots to control");
 DEFINE_string(lcm_command_channel, kLcmCommandChannel,
@@ -136,6 +154,56 @@ class KukaLCMClient  {
                 state.getCommandedTorque(), kNumJoints * sizeof(double));
     std::memcpy(lcm_status_.joint_torque_external.data() + joint_offset,
                 state.getExternalTorque(), kNumJoints * sizeof(double));
+  }
+
+  /// @returns true if robot @p robot_id is in a safe state. Currently only
+  /// checks the external torques field.
+  ///
+  /// Note: Should only be called after UpdateRobotState.
+  bool CheckSafety(int robot_id) const {
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    // Check external torque for each joint.
+    for (int i = 0; i < kNumJoints; i++) {
+      const double ext_torque =
+          lcm_status_.joint_torque_external[joint_offset + i];
+      const double safety_thresh =
+          FLAGS_ext_trq_limit * kJointTorqueSafetyMarginScale[i];
+      if (std::fabs(ext_torque) > safety_thresh) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  void PrintRobotState(int robot_id, std::ostream& out) const {
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    out << "Robot: " << robot_id << ", at time: " << utime_last_.at(robot_id)
+        << "\n";
+    out << "Position: ";
+    PrintVector(lcm_status_.joint_position_measured,
+                joint_offset, kNumJoints, out);
+    out << "Velocity: ";
+    PrintVector(lcm_status_.joint_velocity_estimated,
+                joint_offset, kNumJoints, out);
+    out << "Ext Torque: ";
+    PrintVector(lcm_status_.joint_torque_external,
+                joint_offset, kNumJoints, out);
+    out << "Torque: ";
+    PrintVector(lcm_status_.joint_torque_measured,
+                joint_offset, kNumJoints, out);
+
+    out << "Commanded position: ";
+    PrintVector(lcm_status_.joint_position_commanded,
+                joint_offset, kNumJoints, out);
+
+    out << "Commanded torque: ";
+    PrintVector(lcm_status_.joint_torque_commanded,
+                joint_offset, kNumJoints, out);
   }
 
   /// @return true if valid command data was present, or false if no
@@ -239,13 +307,17 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
               << " command " << state.getClientCommandMode()
               << " overlay " << state.getOverlayType()
               << std::endl;
-
   }
 
   virtual void monitor() {
     KUKA::FRI::LBRClient::monitor();
     lcm_client_->UpdateRobotState(robot_id_, robotState());
- }
+    if (!lcm_client_->CheckSafety(robot_id_)) {
+      lcm_client_->PrintRobotState(robot_id_, std::cerr);
+      throw std::runtime_error("Robot" + std::to_string(robot_id_) +
+                               " is in an unsafe state.");
+    }
+  }
 
   virtual void waitForCommand() {
     KUKA::FRI::LBRClient::waitForCommand();
@@ -258,10 +330,20 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
     }
 
     lcm_client_->UpdateRobotState(robot_id_, robotState());
+    if (!lcm_client_->CheckSafety(robot_id_)) {
+      lcm_client_->PrintRobotState(robot_id_, std::cerr);
+      throw std::runtime_error("Robot" + std::to_string(robot_id_) +
+                               " is in an unsafe state.");
+    }
   }
 
   virtual void command() {
     lcm_client_->UpdateRobotState(robot_id_, robotState());
+    if (!lcm_client_->CheckSafety(robot_id_)) {
+      lcm_client_->PrintRobotState(robot_id_, std::cerr);
+      throw std::runtime_error("Robot" + std::to_string(robot_id_) +
+                               " is in an unsafe state.");
+    }
 
     double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
     const bool command_valid =
@@ -304,6 +386,8 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 };
 
 int do_main() {
+  assert(FLAGS_ext_trq_limit > 0);
+
   std::vector<KUKA::FRI::UdpConnection> connections;
   connections.reserve(FLAGS_num_robots);
   std::vector<KukaFRIClient> clients;
