@@ -55,6 +55,43 @@ class KukaROSCLient {
     joint_pub = nh.advertise<sensor_msgs::JointState>( "joint_states", 0 );
 
   }
+
+  void PublishRobotState(int robot_id, const KUKA::FRI::LBRState& state) {
+    
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    // restamp with ros time
+    ros::Time time_now = ros::Time::now();
+
+    sensor_msgs::JointState joint_state_msg;
+    joint_state_msg.header.stamp = time_now;
+    
+    // names
+    std::vector<std::string> joint_names;
+    for (int i = 0; i < kNumJoints; i++) {
+      joint_names.push_back(std::string("iiwa_joint_")+std::to_string(i+1)); // iiwa_joint_state is 1-ordered
+    }
+    joint_state_msg.name = joint_names;
+
+    // position
+    std::vector<float> joint_positions;
+    for (int i = 0; i < kNumJoints; i++) {
+      joint_positions.push_back(0);  
+    }
+    //std::memcpy(joint_positions, state.getMeasuredJointPosition(), kNumJoints * sizeof(double));
+    
+
+    // velocity
+
+    // effort
+
+    // not yet publishing torques
+
+    joint_pub.publish(joint_state_msg);
+  }
+
+
   const int num_joints_;
   ros::NodeHandle nh;
   ros::Publisher joint_pub;
