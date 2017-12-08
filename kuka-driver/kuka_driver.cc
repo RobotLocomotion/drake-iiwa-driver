@@ -1,4 +1,3 @@
-
 #include "poll.h"
 
 #include <cassert>
@@ -19,6 +18,9 @@
 
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
+
+#include <ros/ros.h>
+#include <sensor_msgs/JointState.h>
 
 using drake::lcmt_iiwa_command;
 using drake::lcmt_iiwa_status;
@@ -43,6 +45,21 @@ DEFINE_string(lcm_status_channel, kLcmStatusChannel,
               "Channel to send LCM status messages on");
 
 namespace kuka_driver {
+
+class KukaROSCLient {
+ public:
+  explicit KukaROSCLient(int num_robots)
+      : num_joints_(num_robots * kNumJoints), nh("~") {
+
+    // Publishers
+    joint_pub = nh.advertise<sensor_msgs::JointState>( "joint_states", 0 );
+
+  }
+  const int num_joints_;
+  ros::NodeHandle nh;
+  ros::Publisher joint_pub;
+  
+};
 
 class KukaLCMClient  {
  public:
@@ -317,6 +334,10 @@ int do_main() {
 } // namespace kuka_driver
 
 int main(int argc, char** argv) {
+  std::cout << "Hey!" << std::endl;
+  double secs =ros::Time::now().toSec();
+  std::cout << "current time in ROS is" << secs << std::endl;
+
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   return kuka_driver::do_main();
 }
