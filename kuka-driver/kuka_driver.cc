@@ -232,6 +232,10 @@ class KukaLCMClient  {
       return false;
     }
 
+    if (lcm_command_.num_torques == 0) {
+      return false;
+    }
+
     assert(lcm_command_.num_torques >= num_joints_);
     memcpy(torque, lcm_command_.joint_torque.data() + joint_offset,
            kNumJoints * sizeof(double));
