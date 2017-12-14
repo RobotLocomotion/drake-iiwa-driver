@@ -139,15 +139,32 @@ class KukaLCMClient  {
                 state.getMeasuredJointPosition(), kNumJoints * sizeof(double));
     std::memcpy(lcm_status_.joint_position_commanded.data() + joint_offset,
                 state.getCommandedJointPosition(), kNumJoints * sizeof(double));
-    if (state.getIpoJointPosition() != NULL) {
-      std::memcpy(lcm_status_.joint_position_ipo.data() + joint_offset,
-                  state.getIpoJointPosition(), kNumJoints * sizeof(double));
-    } else {
-      for (int i = joint_offset; i < joint_offset + kNumJoints; i++) {
-        lcm_status_.joint_position_ipo[i] =
-            std::numeric_limits<double>::quiet_NaN();
+
+    // In Sunrise 1.13, getIpoJointPosition changed from returning
+    // NULL if it wasn't available to throwing an exception.  Try to
+    // avoid triggering the exception, but catch and ignore it if it
+    // happens.  Initalize everything to NaN first in case we don't
+    // make it.
+    for (int i = joint_offset; i < joint_offset + kNumJoints; i++) {
+      lcm_status_.joint_position_ipo[i] =
+          std::numeric_limits<double>::quiet_NaN();
+    }
+    const KUKA::FRI::ESessionState session_state = state.getSessionState();
+    if (session_state == KUKA::FRI::COMMANDING_WAIT ||
+        session_state == KUKA::FRI::COMMANDING_ACTIVE) {
+      try {
+        if (state.getIpoJointPosition() != NULL) {
+          std::memcpy(lcm_status_.joint_position_ipo.data() + joint_offset,
+                      state.getIpoJointPosition(), kNumJoints * sizeof(double));
+        }
+      } catch (...) {
+        // I (sam.creasey) would prefer to catch the specific
+        // exception here, but it's not clear how to detect which
+        // version of FRI you're compiling against to determine if
+        // it's possible to include FRIException.h.
       }
     }
+
     std::memcpy(lcm_status_.joint_torque_measured.data() + joint_offset,
                 state.getMeasuredTorque(), kNumJoints * sizeof(double));
     std::memcpy(lcm_status_.joint_torque_commanded.data() + joint_offset,
