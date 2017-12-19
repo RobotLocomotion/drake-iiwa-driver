@@ -259,10 +259,16 @@ class KukaLCMClient  {
     return true;
   }
 
+  int PollForCommandMessage() {
+    return lcm_.handleTimeout(0);
+  }
+
+  int GetLcmFileno() {
+    return lcm_.getFileno();
+  }
+
   void PublishStateUpdate() {
     lcm_.publish(FLAGS_lcm_status_channel, &lcm_status_);
-    // Also poll for new messages.
-    lcm_.handleTimeout(0);
   }
 
  private:
@@ -416,7 +422,9 @@ int do_main() {
   std::vector<KUKA::FRI::ClientApplication> apps;
   apps.reserve(FLAGS_num_robots);
   KukaLCMClient lcm_client(FLAGS_num_robots);
-  std::vector<struct pollfd> fds(FLAGS_num_robots);
+  // One fd entry for each of the robot FRI connections plus the LCM
+  // client.
+  std::vector<struct pollfd> fds(FLAGS_num_robots + 1);
 
   for (int i = 0; i < FLAGS_num_robots; i++) {
     connections.emplace_back();
@@ -431,6 +439,9 @@ int do_main() {
               << " port " << FLAGS_fri_port + i
               << std::endl;
   }
+  fds.back().fd = lcm_client.GetLcmFileno();
+  fds.back().events = POLLIN;
+  fds.back().revents = 0;
 
   bool success = true;
   while (success) {
@@ -438,6 +449,14 @@ int do_main() {
     if (result < 0) {
       perror("poll failed");
       break;
+    }
+
+    // Handle any incoming LCM command messages before running the FRI
+    // control loop.
+    if (fds.back().revents != 0) {
+      fds.back().revents = 0;  // TODO(sam.creasey) do I actually need
+                               // to clear that?
+      lcm_client.PollForCommandMessage();
     }
 
     for (int i = 0; i < FLAGS_num_robots; i++) {
