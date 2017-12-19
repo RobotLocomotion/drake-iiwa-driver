@@ -14,7 +14,7 @@ import com.kuka.roboticsAPI.controllerModel.Controller;
 import com.kuka.roboticsAPI.deviceModel.LBR;
 import com.kuka.roboticsAPI.executionModel.CommandInvalidException;
 import com.kuka.roboticsAPI.motionModel.PositionHold;
-import com.kuka.roboticsAPI.motionModel.controlModeModel.PositionControlMode;
+import com.kuka.roboticsAPI.motionModel.controlModeModel.JointImpedanceControlMode;
 
 /**
  * Creates a FRI Session.
@@ -61,7 +61,9 @@ public class DrakeFRITorqueDriver extends RoboticsAPIApplication
         FRIJointOverlay jointOverlay = new FRIJointOverlay(
             friSession, ClientCommandMode.TORQUE);
 
-        PositionControlMode ctrMode = new PositionControlMode();
+        JointImpedanceControlMode ctrMode =
+            new JointImpedanceControlMode(1000, 1000, 1000, 500, 500, 500, 500);
+        ctrMode.setDampingForAllJoints(1.0);
         PositionHold posHold = new PositionHold(ctrMode, -1, TimeUnit.SECONDS);
 
         try {
