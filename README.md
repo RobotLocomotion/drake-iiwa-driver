@@ -75,6 +75,9 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 
  * Press the "sync" button.  It's on the toolbar at the top, 5th from the right.  It looks a bit like a square with a couple of arrows over it (though it doesn't look much like this).  This will install the application.
   * Execute
+  
+## Enabling the Safety Configuration on the Robot
+When you upload a new safety configuration to the robot it needs to be enabled. To do this go to `Safety-->Activation` on the pendant. Then click `Activation`. Use the default user, the password is `argus`. This should enable the new configuration.
 
 ## C++ driver
 
