@@ -1,4 +1,3 @@
-
 #include "poll.h"
 
 #include <cassert>
@@ -19,6 +18,9 @@
 
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
+
+#include <ros/ros.h>
+#include <sensor_msgs/JointState.h>
 
 using drake::lcmt_iiwa_command;
 using drake::lcmt_iiwa_status;
@@ -43,6 +45,68 @@ DEFINE_string(lcm_status_channel, kLcmStatusChannel,
               "Channel to send LCM status messages on");
 
 namespace kuka_driver {
+
+void init_ros(int argc, char** argv) {
+  ros::init(argc, argv, "kuka_state_publisher");
+}
+
+class KukaROSCLient {
+ public:
+  explicit KukaROSCLient(int num_robots)
+      : num_joints_(num_robots * kNumJoints), nh("~") {
+
+    // Publishers
+    joint_pub = nh.advertise<sensor_msgs::JointState>( "/joint_states", 0 );
+  }
+
+  void PublishRobotState(int robot_id, const KUKA::FRI::LBRState& state) {
+    
+    const int joint_offset = robot_id * kNumJoints;
+    assert(joint_offset + kNumJoints <= num_joints_);
+
+    // restamp with ros time
+    ros::Time time_now = ros::Time::now();
+
+    sensor_msgs::JointState joint_state_msg;
+    joint_state_msg.header.stamp = time_now;
+    
+    // names
+    std::vector<std::string> joint_names;
+    for (int i = 0; i < kNumJoints; i++) {
+      joint_names.push_back(std::string("iiwa_joint_")+std::to_string(i+1)); // iiwa_joint_state is 1-ordered
+    }
+    joint_state_msg.name = joint_names;
+
+    // position
+    std::vector<double> joint_positions;
+    for (int i = 0; i < kNumJoints; i++) {
+      joint_positions.push_back(state.getMeasuredJointPosition()[i]);  
+    }
+    joint_state_msg.position = joint_positions;
+
+    // velocity
+    std::vector<double> joint_velocities;            // Note: friLBRState does not offer velocities
+    for (int i = 0; i < kNumJoints; i++) {           // Publishing 0s as opposed to uninitialized seems preferable
+      joint_velocities.push_back(0.0);               // for now
+    }
+    joint_state_msg.velocity = joint_velocities;    
+
+    // effort
+    std::vector<double> joint_efforts;                              
+    for (int i = 0; i < kNumJoints; i++) {                             
+      joint_velocities.push_back(state.getMeasuredTorque()[i]);  // for now
+    }
+    joint_state_msg.effort = joint_efforts;
+
+    joint_pub.publish(joint_state_msg);
+  }
+
+
+  const int num_joints_;
+  ros::NodeHandle nh;
+  ros::Publisher joint_pub;
+  
+};
 
 class KukaLCMClient  {
  public:
@@ -153,9 +217,10 @@ class KukaLCMClient  {
 
 class KukaFRIClient : public KUKA::FRI::LBRClient {
  public:
-  KukaFRIClient(int robot_id, KukaLCMClient* lcm_client)
+  KukaFRIClient(int robot_id, KukaLCMClient* lcm_client, KukaROSCLient* ros_client)
       : robot_id_(robot_id),
-        lcm_client_(lcm_client) {
+        lcm_client_(lcm_client),
+        ros_client_(ros_client) {
     // Joint limits derived from visual inspection of KUKA controller
     // output display.  Values in +/- degrees from center.
     joint_limits_.push_back(ToRadians(170));
@@ -202,8 +267,9 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 
   virtual void monitor() {
     KUKA::FRI::LBRClient::monitor();
+    ros_client_->PublishRobotState(robot_id_, robotState());
     lcm_client_->UpdateRobotState(robot_id_, robotState());
- }
+  }
 
   virtual void waitForCommand() {
     KUKA::FRI::LBRClient::waitForCommand();
@@ -215,10 +281,12 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
       robotCommand().setTorque(torque);
     }
 
+    ros_client_->PublishRobotState(robot_id_, robotState());
     lcm_client_->UpdateRobotState(robot_id_, robotState());
   }
 
   virtual void command() {
+    ros_client_->PublishRobotState(robot_id_, robotState());
     lcm_client_->UpdateRobotState(robot_id_, robotState());
 
     double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
@@ -257,6 +325,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 
   int robot_id_;
   KukaLCMClient* lcm_client_;
+  KukaROSCLient* ros_client_;
   std::vector<double> joint_limits_;
   // What was the joint position when we entered command state?
   // (provided so that we can keep holding that position).
@@ -264,6 +333,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 };
 
 int do_main() {
+
   std::vector<KUKA::FRI::UdpConnection> connections;
   connections.reserve(FLAGS_num_robots);
   std::vector<KukaFRIClient> clients;
@@ -271,11 +341,12 @@ int do_main() {
   std::vector<KUKA::FRI::ClientApplication> apps;
   apps.reserve(FLAGS_num_robots);
   KukaLCMClient lcm_client(FLAGS_num_robots);
+  KukaROSCLient ros_client(FLAGS_num_robots);
   std::vector<struct pollfd> fds(FLAGS_num_robots);
 
   for (int i = 0; i < FLAGS_num_robots; i++) {
     connections.emplace_back();
-    clients.emplace_back(i, &lcm_client);
+    clients.emplace_back(i, &lcm_client, &ros_client);
     apps.emplace_back(connections[i], clients[i]);
     apps[i].connect(FLAGS_fri_port + i, NULL);
 
@@ -286,6 +357,7 @@ int do_main() {
               << " port " << FLAGS_fri_port + i
               << std::endl;
   }
+
 
   bool success = true;
   while (success) {
@@ -317,6 +389,8 @@ int do_main() {
 } // namespace kuka_driver
 
 int main(int argc, char** argv) {
+  kuka_driver::init_ros(argc, argv);
+
   gflags::ParseCommandLineFlags(&argc, &argv, true);
   return kuka_driver::do_main();
 }
