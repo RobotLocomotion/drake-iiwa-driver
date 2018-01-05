@@ -459,8 +459,10 @@ int do_main() {
       lcm_client.PollForCommandMessage();
     }
 
+    bool robot_stepped = false;
     for (int i = 0; i < FLAGS_num_robots; i++) {
       if (fds[i].revents != 0) {
+	robot_stepped = true;
         fds[i].revents = 0;  // TODO(sam.creasey) do I actually need
                              // to clear that?
         success = apps[i].step();
@@ -468,7 +470,9 @@ int do_main() {
       }
     }
     if (!success) { break; }
-    lcm_client.PublishStateUpdate();
+    if (robot_stepped) {
+      lcm_client.PublishStateUpdate();
+    }
   }
 
   for (int i = 0; i < FLAGS_num_robots; i++) {
