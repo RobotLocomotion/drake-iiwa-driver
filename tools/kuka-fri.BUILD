@@ -4,17 +4,15 @@ package(default_visibility = ["//visibility:public"])
 
 genrule(
     name = "kuka-fri-build",
-    srcs = ["build/GNUMake",
-            "src",
-            "include/friClientApplication.h",
-            "include/friLBRClient.h",
-            "include/friLBRState.h",
-            "include/friClientIf.h",
-            "include/friUdpConnection.h",
-            "include/friLBRCommand.h",
-            "include/friConnectionIf.h",
+    srcs = glob(['src/**', 'build/GNUMake/**']) + [
+        "include/friClientApplication.h",
+        "include/friLBRClient.h",
+        "include/friLBRState.h",
+        "include/friClientIf.h",
+        "include/friUdpConnection.h",
+        "include/friLBRCommand.h",
+        "include/friConnectionIf.h",
     ],
-    local = 1,
     outs = [
         "libFRIClient.a",
         "friClientApplication.h",
@@ -25,7 +23,7 @@ genrule(
         "friLBRCommand.h",
         "friConnectionIf.h",
         ],
-    cmd = "make -C external/kuka_fri/build/GNUMake &&" +
+    cmd = "make -C external/kuka_fri/build/GNUMake lib &&" +
     "cp external/kuka_fri/lib/libFRIClient.a $(location libFRIClient.a) &&" +
     "cp $(location include/friClientApplication.h) $(location friClientApplication.h) &&" +
     "cp $(location include/friLBRClient.h) $(location friLBRClient.h) && " +
