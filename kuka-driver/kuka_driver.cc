@@ -94,7 +94,7 @@ class KukaROSCLient {
     // effort
     std::vector<double> joint_efforts;                              
     for (int i = 0; i < kNumJoints; i++) {                             
-      joint_velocities.push_back(state.getMeasuredTorque()[i]);  // for now
+      joint_efforts.push_back(state.getExternalTorque()[i]);  // hack for now to get external torque measurements
     }
     joint_state_msg.effort = joint_efforts;
 
