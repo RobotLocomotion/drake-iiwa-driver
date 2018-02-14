@@ -9,7 +9,7 @@ cc_binary(
         "low_pass_filter.h"
     ],
     deps = [
-        "@drake//drake/lcmtypes:iiwa",
+        "@drake//lcmtypes:iiwa",
         "@gflags//:gflags",
         "@kuka_fri//:kuka-fri-lib",
         "@lcm//:lcm",
