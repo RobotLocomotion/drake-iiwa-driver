@@ -1,45 +1,66 @@
 # -*- python -*-
 
-package(default_visibility = ["//visibility:public"])
-
-genrule(
-    name = "kuka-fri-build",
-    srcs = glob(['src/**', 'build/GNUMake/**']) + [
-        "include/friClientApplication.h",
-        "include/friLBRClient.h",
-        "include/friLBRState.h",
-        "include/friClientIf.h",
-        "include/friUdpConnection.h",
-        "include/friLBRCommand.h",
-        "include/friConnectionIf.h",
-    ],
-    outs = [
-        "libFRIClient.a",
-        "friClientApplication.h",
-        "friLBRClient.h",
-        "friLBRState.h",
-        "friClientIf.h",
-        "friUdpConnection.h",
-        "friLBRCommand.h",
-        "friConnectionIf.h",
+cc_library(
+    name = "nanopb",
+    srcs = [
+        "src/nanopb-0.2.8/pb_decode.c",
+        "src/nanopb-0.2.8/pb_encode.c",
         ],
-    cmd = "make -C external/kuka_fri/build/GNUMake lib &&" +
-    "cp external/kuka_fri/lib/libFRIClient.a $(location libFRIClient.a) &&" +
-    "cp $(location include/friClientApplication.h) $(location friClientApplication.h) &&" +
-    "cp $(location include/friLBRClient.h) $(location friLBRClient.h) && " +
-    "cp $(location include/friLBRState.h) $(location friLBRState.h) && " +
-    "cp $(location include/friClientIf.h) $(location friClientIf.h) && " +
-    "cp $(location include/friUdpConnection.h) $(location friUdpConnection.h) &&" +
-    "cp $(location include/friLBRCommand.h) $(location friLBRCommand.h) && " +
-    "cp $(location include/friConnectionIf.h) $(location friConnectionIf.h)"
-    )
+    hdrs = [
+        "src/nanopb-0.2.8/pb.h",
+        "src/nanopb-0.2.8/pb_decode.h",
+        "src/nanopb-0.2.8/pb_encode.h",
+        "src/nanopb-0.2.8/pb_syshdr.h",
+    ],
+    strip_include_prefix = "src/nanopb-0.2.8",
+)
+
+cc_library(
+    name = "protobuf_gen",
+    srcs = ["src/protobuf_gen/FRIMessages.pb.c"],
+    hdrs = ["src/protobuf_gen/FRIMessages.pb.h"],
+    strip_include_prefix = "src/protobuf_gen",
+    deps = [
+        ":nanopb",
+        ],
+)
+
+cc_library(
+    name = "protobuf",
+    srcs = glob(["src/protobuf/*.c", "src/protobuf/*.cpp"]),
+    hdrs = glob(["src/protobuf/*.h"]),
+    strip_include_prefix = "src/protobuf",
+    deps = [
+        ":nanopb",
+        ":protobuf_gen",
+    ],
+)
+
+cc_library(
+    name = "clientbase_header",
+    hdrs = glob(["src/base/*.h"]),
+    strip_include_prefix = "src/base",
+    deps = [
+        ":nanopb",
+        ":protobuf",
+        ":protobuf_gen",
+    ],
+)
+
 
 cc_library(
     name = "kuka-fri-lib",
-    # This is just here to suppress a warning, it has no effect.
-    linkstatic = 1,
-    srcs = [
-        "kuka-fri-build",
-        ],
-    deps =[],
+    srcs = glob(["src/base/*.cpp",
+                 "src/client_lbr/*.cpp",
+                 "src/connection/*.cpp"]),
+    hdrs = glob(["include/*.h"]),
+    copts = ["-fpermissive" ],
+    visibility = ["//visibility:public"],
+    strip_include_prefix = "include",
+    deps = [
+        ":clientbase_header",
+        ":nanopb",
+        ":protobuf",
+        ":protobuf_gen",
+    ],
 )
