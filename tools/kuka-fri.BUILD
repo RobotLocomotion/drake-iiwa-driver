@@ -5,7 +5,7 @@ cc_library(
     srcs = [
         "src/nanopb-0.2.8/pb_decode.c",
         "src/nanopb-0.2.8/pb_encode.c",
-        ],
+    ],
     hdrs = [
         "src/nanopb-0.2.8/pb.h",
         "src/nanopb-0.2.8/pb_decode.h",
@@ -24,12 +24,15 @@ cc_library(
     strip_include_prefix = "src/protobuf_gen",
     deps = [
         ":nanopb",
-        ],
+    ],
 )
 
 cc_library(
     name = "protobuf",
-    srcs = glob(["src/protobuf/*.c", "src/protobuf/*.cpp"]),
+    srcs = glob([
+        "src/protobuf/*.c",
+        "src/protobuf/*.cpp",
+    ]),
     hdrs = glob(["src/protobuf/*.h"]),
     copts = ["-w"],
     strip_include_prefix = "src/protobuf",
@@ -51,16 +54,20 @@ cc_library(
     ],
 )
 
-
 cc_library(
     name = "kuka-fri-lib",
-    srcs = glob(["src/base/*.cpp",
-                 "src/client_lbr/*.cpp",
-                 "src/connection/*.cpp"]),
+    srcs = glob([
+        "src/base/*.cpp",
+        "src/client_lbr/*.cpp",
+        "src/connection/*.cpp",
+    ]),
     hdrs = glob(["include/*.h"]),
-    copts = ["-fpermissive", "-w"],
-    visibility = ["//visibility:public"],
+    copts = [
+        "-fpermissive",
+        "-w",
+    ],
     strip_include_prefix = "include",
+    visibility = ["//visibility:public"],
     deps = [
         ":clientbase_header",
         ":nanopb",
