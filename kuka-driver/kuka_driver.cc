@@ -57,6 +57,10 @@ void PrintVector(const std::vector<double>& array, int start, int length,
 
 DEFINE_double(ext_trq_limit, kJointTorqueSafetyMarginNm,
               "Maximal external torque that triggers safety freeze");
+DEFINE_string(joint_ext_trq_limit, "", "Specify the maximum external torque "
+              "that triggers safety freeze on a per-joint basis.  "
+              "This is a comma separated list of numbers e.g. "
+              "100,100,53.7,30,30,28.5,10.  Overrides ext_trq_limit.");
 DEFINE_int32(fri_port, kDefaultPort, "First UDP port for FRI messages");
 DEFINE_int32(num_robots, 1, "Number of robots to control");
 DEFINE_string(lcm_command_channel, kLcmCommandChannel,
@@ -89,6 +93,34 @@ class KukaLCMClient  {
     // Use -1 as a sentinal to indicate that no command has been
     // received.
     lcm_command_.utime = -1;
+
+    // Set torque limits.
+    if (FLAGS_joint_ext_trq_limit.empty()) {
+      for (int i = 0; i < kNumJoints; ++i) {
+        external_torque_limit_.push_back(
+            FLAGS_ext_trq_limit * kJointTorqueSafetyMarginScale[i]);
+      }
+    } else {
+      std::string remain = FLAGS_joint_ext_trq_limit;
+      for (int i = 0; i < kNumJoints - 1; ++i) {
+        const auto next_comma = remain.find(",");
+        if (next_comma == std::string::npos) {
+          throw std::runtime_error(
+              "--joint_ext_trq_limit must contain 7 comma delimited values");
+        }
+        std::string next = remain.substr(0, next_comma);
+        external_torque_limit_.push_back(std::stod(next));
+        remain = remain.substr(next_comma + 1);
+      }
+      if (remain.empty() || remain.find(",") != std::string::npos) {
+        throw std::runtime_error(
+            "--joint_ext_trq_limit must contain 7 comma delimited values");
+      }
+      external_torque_limit_.push_back(std::stod(remain));
+    }
+
+    std::cerr << "Joint torque limits: ";
+    PrintVector(external_torque_limit_, 0, kNumJoints, std::cerr);
 
     // Initialize filters.
     const double cutoff_hz = 40;
@@ -188,9 +220,7 @@ class KukaLCMClient  {
     for (int i = 0; i < kNumJoints; i++) {
       const double ext_torque =
           lcm_status_.joint_torque_external[joint_offset + i];
-      const double safety_thresh =
-          FLAGS_ext_trq_limit * kJointTorqueSafetyMarginScale[i];
-      if (std::fabs(ext_torque) > safety_thresh) {
+      if (std::fabs(ext_torque) > external_torque_limit_[i]) {
         return false;
       }
     }
@@ -285,6 +315,8 @@ class KukaLCMClient  {
   lcm::LCM lcm_;
   lcmt_iiwa_status lcm_status_{};
   lcmt_iiwa_command lcm_command_{};
+
+  std::vector<double> external_torque_limit_;
 
   // Filters
   std::vector<DiscreteTimeLowPassFilter<double>> vel_filters_;
