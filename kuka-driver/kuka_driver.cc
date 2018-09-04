@@ -71,6 +71,11 @@ DEFINE_string(lcm_command_channel, kLcmCommandChannel,
 DEFINE_string(lcm_status_channel, kLcmStatusChannel,
               "Channel to send LCM status messages on");
 DEFINE_bool(realtime, false, "Use realtime priority");
+DEFINE_bool(mlockall, true, "Prevent memory from being paged out");
+DEFINE_bool(sched_fifo, true, "Use FIFO realtime scheduling. This assumes that "
+            "this driver is the most important realtime-sensitive task running "
+            "and should be provided as much scheduler time as it needs.");
+DEFINE_int32(priority, 90, "Priority for realtime scheduling");
 DEFINE_bool(restart_fri, false,
             "Restart robot motion after the FRI signal has degraded and "
             "been restored.");
@@ -479,10 +484,15 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 int do_main() {
   assert(FLAGS_ext_trq_limit > 0);
 
-  // Lock memory to prevent the OS from paging us out.
-  if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
-    perror("mlockall failed");
-    return EXIT_FAILURE;
+  if (FLAGS_mlockall) {
+    // Lock memory to prevent the OS from paging us out.
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+      perror("mlockall failed");
+      return EXIT_FAILURE;
+    }
+    std::cout << "Locked memory to prevent paging out" << std::endl;
+  } else {
+    std::cerr << "Memory is not locked" << std::endl;
   }
 
   if (FLAGS_realtime) {
@@ -491,8 +501,10 @@ int do_main() {
     // 90 is as high as you generally want to go on PREEMPT_RT machines.
     // Any higher than this and you will have higher priority than the kernel
     // threads that serve interrupts, and the system will stop responding.
-    scheduler_options.sched_priority = 90;
-    if (sched_setscheduler(0, SCHED_FIFO, &scheduler_options) != 0) {
+    const int realtime_priority = std::min(90, std::max(0, FLAGS_priority));
+    scheduler_options.sched_priority = realtime_priority;
+    const int policy = (FLAGS_sched_fifo) ? SCHED_FIFO : SCHED_RR;
+    if (sched_setscheduler(0, policy, &scheduler_options) != 0) {
       perror("sched_setscheduler failed");
       return EXIT_FAILURE;
     }
