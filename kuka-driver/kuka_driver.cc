@@ -1,5 +1,6 @@
-
-#include "poll.h"
+#include <poll.h>
+#include <sched.h>
+#include <sys/mman.h>
 
 #include <cassert>
 #include <cmath>
@@ -28,7 +29,7 @@ using drake::lcmt_iiwa_status;
 namespace {
 
 const int kNumJoints = 7;
-const int kDefaultPort = 30200;
+const int kDefaultPort = 30201;
 const char* kLcmStatusChannel = "IIWA_STATUS";
 const char* kLcmCommandChannel = "IIWA_COMMAND";
 const double kTimeStep = 0.005;
@@ -474,6 +475,20 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 
 int do_main() {
   assert(FLAGS_ext_trq_limit > 0);
+
+  // Lock memory to prevent the OS from paging us out.
+  if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+    perror("mlockall failed");
+    return -1;
+  }
+
+  // Set realtime priority
+  struct sched_param scheduler_options;
+  scheduler_options.sched_priority = 90;
+  if (sched_setscheduler(0, SCHED_FIFO, &scheduler_options) != 0) {
+    perror("sched_setscheduler failed");
+    return -1;
+  }
 
   std::vector<KUKA::FRI::UdpConnection> connections;
   connections.reserve(FLAGS_num_robots);
