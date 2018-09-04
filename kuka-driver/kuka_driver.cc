@@ -71,7 +71,8 @@ DEFINE_string(lcm_command_channel, kLcmCommandChannel,
 DEFINE_string(lcm_status_channel, kLcmStatusChannel,
               "Channel to send LCM status messages on");
 DEFINE_bool(realtime, false, "Use realtime priority");
-DEFINE_bool(mlockall, true, "Prevent memory from being paged out");
+DEFINE_bool(mlockall, false, "Prevent memory from being paged out. This is "
+            "automatically enabled if realtime prority is enabled.");
 DEFINE_bool(sched_fifo, true, "Use FIFO realtime scheduling. This assumes that "
             "this driver is the most important realtime-sensitive task running "
             "and should be provided as much scheduler time as it needs.");
@@ -484,7 +485,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 int do_main() {
   assert(FLAGS_ext_trq_limit > 0);
 
-  if (FLAGS_mlockall) {
+  if (FLAGS_mlockall || FLAGS_realtime) {
     // Lock memory to prevent the OS from paging us out.
     if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
       perror("mlockall failed");
