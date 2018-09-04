@@ -1,5 +1,7 @@
-
-#include "poll.h"
+#include <poll.h>
+#include <sched.h>
+#include <stdlib.h>
+#include <sys/mman.h>
 
 #include <cassert>
 #include <cmath>
@@ -62,11 +64,19 @@ DEFINE_string(joint_ext_trq_limit, "", "Specify the maximum external torque "
               "This is a comma separated list of numbers e.g. "
               "100,100,53.7,30,30,28.5,10.  Overrides ext_trq_limit.");
 DEFINE_int32(fri_port, kDefaultPort, "First UDP port for FRI messages");
+DEFINE_string(lcm_url, "", "LCM URL for Kuka driver");
 DEFINE_int32(num_robots, 1, "Number of robots to control");
 DEFINE_string(lcm_command_channel, kLcmCommandChannel,
               "Channel to receive LCM command messages on");
 DEFINE_string(lcm_status_channel, kLcmStatusChannel,
               "Channel to send LCM status messages on");
+DEFINE_bool(realtime, false, "Use realtime priority");
+DEFINE_bool(mlockall, false, "Prevent memory from being paged out. This is "
+            "automatically enabled if realtime prority is enabled.");
+DEFINE_bool(sched_fifo, true, "Use FIFO realtime scheduling. This assumes that "
+            "this driver is the most important realtime-sensitive task running "
+            "and should be provided as much scheduler time as it needs.");
+DEFINE_int32(priority, 90, "Priority for realtime scheduling");
 DEFINE_bool(restart_fri, false,
             "Restart robot motion after the FRI signal has degraded and "
             "been restored.");
@@ -75,8 +85,8 @@ namespace kuka_driver {
 
 class KukaLCMClient  {
  public:
-  explicit KukaLCMClient(int num_robots)
-      : num_joints_(num_robots * kNumJoints) {
+  KukaLCMClient(int num_robots, const std::string& lcm_url)
+      : num_joints_(num_robots * kNumJoints), lcm_(lcm_url) {
 
     // Use -1 as a sentinal to indicate that no status has been
     // sent (or received from the robot).
@@ -475,13 +485,42 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 int do_main() {
   assert(FLAGS_ext_trq_limit > 0);
 
+  if (FLAGS_mlockall || FLAGS_realtime) {
+    // Lock memory to prevent the OS from paging us out.
+    if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
+      perror("mlockall failed");
+      return EXIT_FAILURE;
+    }
+    std::cout << "Locked memory to prevent paging out" << std::endl;
+  } else {
+    std::cerr << "Memory is not locked" << std::endl;
+  }
+
+  if (FLAGS_realtime) {
+    // Set realtime priority.
+    struct sched_param scheduler_options = {};
+    // 90 is as high as you generally want to go on PREEMPT_RT machines.
+    // Any higher than this and you will have higher priority than the kernel
+    // threads that serve interrupts, and the system will stop responding.
+    const int realtime_priority = std::min(90, std::max(0, FLAGS_priority));
+    scheduler_options.sched_priority = realtime_priority;
+    const int policy = (FLAGS_sched_fifo) ? SCHED_FIFO : SCHED_RR;
+    if (sched_setscheduler(0, policy, &scheduler_options) != 0) {
+      perror("sched_setscheduler failed");
+      return EXIT_FAILURE;
+    }
+    std::cout << "Got realtime priority" << std::endl;
+  } else {
+    std::cerr << "Running without realtime priority" << std::endl;
+  }
+
   std::vector<KUKA::FRI::UdpConnection> connections;
   connections.reserve(FLAGS_num_robots);
   std::vector<KukaFRIClient> clients;
   clients.reserve(FLAGS_num_robots);
   std::vector<KUKA::FRI::ClientApplication> apps;
   apps.reserve(FLAGS_num_robots);
-  KukaLCMClient lcm_client(FLAGS_num_robots);
+  KukaLCMClient lcm_client(FLAGS_num_robots, FLAGS_lcm_url);
   // One fd entry for each of the robot FRI connections plus the LCM
   // client.
   std::vector<struct pollfd> fds(FLAGS_num_robots + 1);
