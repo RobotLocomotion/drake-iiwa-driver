@@ -1,5 +1,6 @@
 #include <poll.h>
 #include <sched.h>
+#include <stdlib.h>
 #include <sys/mman.h>
 
 #include <cassert>
@@ -30,7 +31,6 @@ namespace {
 
 const int kNumJoints = 7;
 const int kDefaultPort = 30200;
-const char* kKukaDriverLcmUrl = "udpm://231.255.66.66:6666?ttl=1";
 const char* kLcmStatusChannel = "IIWA_STATUS";
 const char* kLcmCommandChannel = "IIWA_COMMAND";
 const double kTimeStep = 0.005;
@@ -64,7 +64,7 @@ DEFINE_string(joint_ext_trq_limit, "", "Specify the maximum external torque "
               "This is a comma separated list of numbers e.g. "
               "100,100,53.7,30,30,28.5,10.  Overrides ext_trq_limit.");
 DEFINE_int32(fri_port, kDefaultPort, "First UDP port for FRI messages");
-DEFINE_string(lcm_url, kKukaDriverLcmUrl, "LCM URL for Kuka driver");
+DEFINE_string(lcm_url, "", "LCM URL for Kuka driver");
 DEFINE_int32(num_robots, 1, "Number of robots to control");
 DEFINE_string(lcm_command_channel, kLcmCommandChannel,
               "Channel to receive LCM command messages on");
@@ -482,16 +482,19 @@ int do_main() {
   // Lock memory to prevent the OS from paging us out.
   if (mlockall(MCL_CURRENT | MCL_FUTURE) != 0) {
     perror("mlockall failed");
-    return -1;
+    return EXIT_FAILURE;
   }
 
   if (FLAGS_realtime) {
-    // Set realtime priority
-    struct sched_param scheduler_options;
+    // Set realtime priority.
+    struct sched_param scheduler_options = {};
+    // 90 is as high as you generally want to go on PREEMPT_RT machines.
+    // Any higher than this and you will have higher priority than the kernel
+    // threads that serve interrupts, and the system will stop responding.
     scheduler_options.sched_priority = 90;
     if (sched_setscheduler(0, SCHED_FIFO, &scheduler_options) != 0) {
       perror("sched_setscheduler failed");
-      return -1;
+      return EXIT_FAILURE;
     }
     std::cout << "Got realtime priority" << std::endl;
   } else {
