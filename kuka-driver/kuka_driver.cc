@@ -4,6 +4,7 @@
 #include <sys/mman.h>
 
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstring>
 
@@ -21,17 +22,21 @@
 
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
+#include "drake/lcmt_iiwa_status_telemetry.hpp"
 
 #include "low_pass_filter.h"
 
+
 using drake::lcmt_iiwa_command;
 using drake::lcmt_iiwa_status;
+using drake::lcmt_iiwa_status_telemetry;
 
 namespace {
 
 const int kNumJoints = 7;
 const int kDefaultPort = 30200;
 const char* kLcmStatusChannel = "IIWA_STATUS";
+const char* kLcmStatusTelemetryChannel = "IIWA_STATUS_TELEMETRY";
 const char* kLcmCommandChannel = "IIWA_COMMAND";
 const double kTimeStep = 0.005;
 const double kJointLimitSafetyMarginDegree = 1;
@@ -55,6 +60,11 @@ void PrintVector(const std::vector<double>& array, int start, int length,
   }
 }
 
+int64_t micros() {
+  return std::chrono::duration_cast<std::chrono::microseconds>(
+      std::chrono::system_clock::now().time_since_epoch()).count();
+}
+
 }  // namespace
 
 DEFINE_double(ext_trq_limit, kJointTorqueSafetyMarginNm,
@@ -70,6 +80,8 @@ DEFINE_string(lcm_command_channel, kLcmCommandChannel,
               "Channel to receive LCM command messages on");
 DEFINE_string(lcm_status_channel, kLcmStatusChannel,
               "Channel to send LCM status messages on");
+DEFINE_string(lcm_status_telemetry_channel, kLcmStatusTelemetryChannel,
+              "Channel to send LCM status telemetry messages on");
 DEFINE_bool(realtime, false, "Use realtime priority");
 DEFINE_bool(mlockall, false, "Prevent memory from being paged out. This is "
             "automatically enabled if realtime prority is enabled.");
@@ -83,10 +95,71 @@ DEFINE_bool(restart_fri, false,
 
 namespace kuka_driver {
 
+class TimeSyncInterface {
+ public:
+  virtual void add_measurement(const int64_t remote, const int64_t host) = 0;
+  virtual int64_t to_host(const int64_t remote) const = 0;
+};
+
+class TimeSyncFilter : public TimeSyncInterface {
+ public:
+  /**
+   * Constructor for a naive synchronizer for iiwa's and the host machine's
+   * clock. This uses a exponential filter to estimates the time difference
+   * between the clocks (host - iiwa), and uses it to offset the iiwa's
+   * time stamp.
+   * @param num_measurement Number of initial measurements to build a
+   * reasonable estimate of the time difference.
+   */
+  TimeSyncFilter(uint64_t num_measurement)
+    : num_measurement_(num_measurement), filter_(0.99) {}
+
+  /**
+   * Returns the current estimated time difference: host - remote.
+   */
+  int64_t get_diff() const {
+    return static_cast<int64_t>(filter_.get_filtered());
+  }
+
+  /**
+   * Converts the remote time stamp to host. If number of measurements is
+   * smaller than the specified amount to the constructor, return -1.
+   */
+  int64_t to_host(const int64_t remote) const override {
+    if (!is_init()) return -1;
+    return get_diff() + remote;
+  }
+
+  /**
+   * Adds a measurement given by `remote` and `host`.
+   */
+  void add_measurement(const int64_t remote, const int64_t host) override {
+    double dt_utime = static_cast<double>(host - remote);
+    if (ctr_ == 0) {
+      filter_.set_initial(dt_utime);
+    }
+
+    filter_.filter(dt_utime);
+
+    if (!is_init()) {
+      ctr_++;
+    }
+  }
+
+ private:
+  bool is_init() const {
+    return ctr_ >= num_measurement_;
+  }
+
+  uint64_t num_measurement_;
+  uint64_t ctr_{0};
+  DiscreteTimeLowPassFilter<double> filter_;
+};
+
 class KukaLCMClient  {
  public:
   KukaLCMClient(int num_robots, const std::string& lcm_url)
-      : num_joints_(num_robots * kNumJoints), lcm_(lcm_url) {
+      : num_joints_(num_robots * kNumJoints), lcm_(lcm_url), sync_(200) {
 
     // Use -1 as a sentinal to indicate that no status has been
     // sent (or received from the robot).
@@ -149,23 +222,33 @@ class KukaLCMClient  {
     assert(joint_offset + kNumJoints <= num_joints_);
 
     // Current time stamp for this robot.
-    const int64_t utime_now =
+    const int64_t remote_utime =
         state.getTimestampSec() * 1e6 + state.getTimestampNanoSec() / 1e3;
+    const int64_t host_utime = micros();
+
     // Get delta time for this robot.
     double robot_dt = 0.;
     if (utime_last_.at(robot_id) != -1) {
-      robot_dt = (utime_now - utime_last_.at(robot_id)) / 1e6;
+      robot_dt = (remote_utime - utime_last_.at(robot_id)) / 1e6;
       // Check timing
       if (std::abs(robot_dt - kTimeStep) > 1e-3) {
         std::cout << "Warning: dt " << robot_dt
                   << ", kTimeStep " << kTimeStep << "\n";
       }
     }
-    utime_last_.at(robot_id) = utime_now;
+    utime_last_.at(robot_id) = remote_utime;
 
     // The choice of robot id 0 for the timestamp is arbitrary.
     if (robot_id == 0) {
-      lcm_status_.utime = utime_now;
+      // Estimate time difference between host and iiwa.
+      sync_.add_measurement(remote_utime, host_utime);
+      // Set the iiwa_status' time stamp using the estimated time difference.
+      lcm_status_.utime = sync_.to_host(remote_utime);
+
+      // Save telemetry information.
+      lcm_status_telemetry_.host_utime = host_utime;
+      lcm_status_telemetry_.iiwa_utime = remote_utime;
+      lcm_status_telemetry_.estimated_diff = sync_.get_diff();
     }
 
     // Velocity filtering.
@@ -312,6 +395,7 @@ class KukaLCMClient  {
 
   void PublishStateUpdate() {
     lcm_.publish(FLAGS_lcm_status_channel, &lcm_status_);
+    lcm_.publish(FLAGS_lcm_status_telemetry_channel, &lcm_status_telemetry_);
   }
 
  private:
@@ -324,6 +408,7 @@ class KukaLCMClient  {
   const int num_joints_;
   lcm::LCM lcm_;
   lcmt_iiwa_status lcm_status_{};
+  lcmt_iiwa_status_telemetry lcm_status_telemetry_{};
   lcmt_iiwa_command lcm_command_{};
 
   std::vector<double> external_torque_limit_;
@@ -331,6 +416,8 @@ class KukaLCMClient  {
   // Filters
   std::vector<DiscreteTimeLowPassFilter<double>> vel_filters_;
   std::vector<int64_t> utime_last_;
+
+  TimeSyncFilter sync_;
 };
 
 class KukaFRIClient : public KUKA::FRI::LBRClient {
