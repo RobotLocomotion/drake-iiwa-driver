@@ -95,13 +95,7 @@ DEFINE_bool(restart_fri, false,
 
 namespace kuka_driver {
 
-class TimeSyncInterface {
- public:
-  virtual void add_measurement(const int64_t remote, const int64_t host) = 0;
-  virtual int64_t to_host(const int64_t remote) const = 0;
-};
-
-class TimeSyncFilter : public TimeSyncInterface {
+class TimeSyncFilter {
  public:
   /**
    * Constructor for a naive synchronizer for iiwa's and the host machine's
@@ -125,7 +119,7 @@ class TimeSyncFilter : public TimeSyncInterface {
    * Converts the remote time stamp to host. If number of measurements is
    * smaller than the specified amount to the constructor, return -1.
    */
-  int64_t to_host(const int64_t remote) const override {
+  int64_t to_host(const int64_t remote) const {
     if (!is_init()) return -1;
     return get_diff() + remote;
   }
@@ -133,7 +127,7 @@ class TimeSyncFilter : public TimeSyncInterface {
   /**
    * Adds a measurement given by `remote` and `host`.
    */
-  void add_measurement(const int64_t remote, const int64_t host) override {
+  void add_measurement(const int64_t remote, const int64_t host) {
     double dt_utime = static_cast<double>(host - remote);
     if (ctr_ == 0) {
       filter_.set_initial(dt_utime);
@@ -151,7 +145,7 @@ class TimeSyncFilter : public TimeSyncInterface {
     return ctr_ >= num_measurement_;
   }
 
-  uint64_t num_measurement_;
+  const uint64_t num_measurement_;
   uint64_t ctr_{0};
   DiscreteTimeLowPassFilter<double> filter_;
 };
@@ -248,7 +242,7 @@ class KukaLCMClient  {
       // Save telemetry information.
       lcm_status_telemetry_.host_utime = host_utime;
       lcm_status_telemetry_.iiwa_utime = remote_utime;
-      lcm_status_telemetry_.estimated_diff = sync_.get_diff();
+      lcm_status_telemetry_.estimated_dt_host_minus_iiwa = sync_.get_diff();
     }
 
     // Velocity filtering.

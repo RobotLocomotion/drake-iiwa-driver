@@ -11,8 +11,8 @@ new_local_repository(
     )
 
 (DRAKE_COMMIT, DRAKE_CHECKSUM) = (
-    "e27fa1db17775ca3e141921b1570bde6beff448b",
-    "f1508894c26db196506aa81970a9ba577b697a94b14137427f8e1d4c7e50cfb3",
+    "e899feec209a6d4a6f7ecc1266cbc933f46ce30e",
+    "d15eda0625b8fed108b33facd3dde048d0ab6f31588e45e881382f1b79eed723",
 )
 # Before changing the COMMIT, temporarily uncomment the next line so that Bazel
 # displays the suggested new value for the CHECKSUM.
