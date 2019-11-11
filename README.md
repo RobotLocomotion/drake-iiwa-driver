@@ -28,7 +28,20 @@ address which can communicate with 172.31.1.147/16, and which is
 connected to the X66 port.
 
 ### Installing Sunrise Connectivity Software
-In order to use FRI to drive the arms additional software must be installed. In the DVD's that were shipped to you their should be one called "Media". It should contain files with names like 0000288631_00_KUKA Sunrise.FRI 1.13_1.13.0_B6_C358496.zip. These are Java packages. In order to use them when developing the Sunrise Workbench Application they must be installed. In kuka speak these are called "software options". In the SunriseWorkbench documentation (1.11) Section 10.5.1 details how to install software options. The basic steps are
+
+**Note**: This step may no longer be necessary with newer version of Sunrise
+which install options such as FRI during the main installation
+process.  For older versions, see below.
+
+In order to use FRI to drive the arms additional software must be
+installed. In the DVD's that were shipped to you their should be one
+called "Media". It should contain files with names like
+`0000288631_00_KUKA Sunrise.FRI 1.13_1.13.0_B6_C358496.zip`. These are
+Java packages. In order to use them when developing the Sunrise
+Workbench Application they must be installed. In kuka speak these are
+called "software options". In the SunriseWorkbench documentation
+(1.11) Section 10.5.1 details how to install software options. The
+basic steps are
 
   * In dropdown menu **Help->Install new software**
   * In the rop right of the **Work with** box click **Add**
@@ -45,8 +58,8 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
   * IP address of the controller can be left at 172.31.1.147
   * Create new project
   * Project Name: DrakeFRIDriver
-  * Topology template: LBR iiwa 14 R820
-  * Media Flange: Medien-Flansch Touch pneumatisch
+  * Topology template: LBR iiwa 14 R820 (or the appropriate model)
+  * Media Flange: Medien-Flansch Touch pneumatisch (or the appropriate model)
   * Create Application
   * Source folder: whatever
   * Package: drake_fri
@@ -54,9 +67,7 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
 
  * In "Package Explorer", select StationSetup.cat
   * Software (leave anything checked which already is, I think)
-   * Direct Servo Motion Extension (might not be needed?)
    * Fast Robot Interface
-   * Smart Servo Motion Extension
   * Save (Ctrl-S)
 
  * In "Package Explorer", select SafetyConfiguration.sconf
@@ -81,9 +92,6 @@ When you upload a new safety configuration to the robot it needs to be enabled. 
 
 ## C++ driver
 
-**The build for the C++ driver depends on lcm and drake-lcmtypes, so
-  it must be compiled as a component in a superbuild.**
-
 Once Sunrise Workbench is provisioned, you'll need to configure the
 system which will communicate directly with the KONI interface.  This
 system must be configured for the IP address 192.170.10.200 (netmask
@@ -98,12 +106,20 @@ turn the key switch back. Choose either "DrakeFRITorqueDriver" or
 "DrakeFRIPositionDriver" from "Application". Press the green "Play"
 button on the left sidebar of the SmartPad.
 
+### Compiling the driver
+
 Next, build the driver program to communicate with the iiwa arm using
 FRI, and with the controlling application using LCM.  Compiling this
 project will output a single program in the build directory called
 "kuka_driver".  Running it with no arguments will connect to the IIWA
 at it's default address and port (192.170.10.2, port 30200), negotiate
 LCM into the command state, and report the IIWA status via LCM.
+
+An application wishing to control the arm should listen to LCM for
+status updates and command the joints appropriately in response.
+
+The C++ driver can be build with either CMake or bazel.  There are two
+external dependencies which need to be provided, FRI and drake.
 
 This repository is configured with a private git submodule for the
 KUKA FRI source code. To pull it:
@@ -113,7 +129,8 @@ git submodule update
 ```
 
 If you do not have access to that repository, you will need to install
-your own version of the FRI source:
+your own version of the FRI source (which can be found in your Sunrise
+project in the directory FastRobotInterface_Client_Source).
 
 ```
 cd kuka-fri
@@ -121,8 +138,31 @@ unzip /path/to/your/copy/of/FRI-Client-SDK_Cpp.zip
 patch -p1 < ../fri_udp_connection_file_descriptor.diff
 ```
 
-The patch above applies correctly to the FRI 1.7 and 1.11 source.
+The patch above applies correctly to the FRI 1.7, 1.11, and 1.14 source.
 Other versions have not been tested.
 
-An application wishing to control the arm should listen to LCM for
-status updates and command the joints appropriately in response.
+#### Building with bazel
+
+When building with bazel, it will automatically fetch a copy of drake
+to build against.  You should be able to run `bazel build //...` to
+produce a working driver.
+
+This is the easiest method for developers who are already working with
+the drake source, since a working bazel build enviornment for drake
+should be sufficient to build this package.
+
+#### Building with CMake
+
+When building with CMake, you'll need a binary copy of drake.  The
+latest release can be found at
+https://github.com/RobotLocomotion/drake/releases.  Uncompress the
+binary tarfile, and add
+`-DCMAKE_PREFIX_PATH=<path-to-drake>/drake/lib/cmake` to your cmake
+command line.  For example:
+
+```
+mkdir build
+cd build
+cmake .. -DCMAKE_PREFIX_PATH=/tmp/drake/lib/cmake
+make
+```
