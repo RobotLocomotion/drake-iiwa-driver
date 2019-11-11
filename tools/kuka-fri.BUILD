@@ -1,5 +1,16 @@
 # -*- python -*-
 
+DEFS = [
+    # The trailing whitespace after the quote seems to be necessary.
+    '-DPB_SYSTEM_HEADER=\\"pb_syshdr.h\\" ',
+    "-DPB_FIELD_16BIT",
+    "-DHAVE_STDINT_H",
+    "-DHAVE_STDDEF_H",
+    "-DHAVE_STDBOOL_H",
+    "-DHAVE_STDLIB_H",
+    "-DHAVE_STRING_H",
+]
+
 cc_library(
     name = "nanopb",
     srcs = [
@@ -12,7 +23,7 @@ cc_library(
         "src/nanopb-0.2.8/pb_encode.h",
         "src/nanopb-0.2.8/pb_syshdr.h",
     ],
-    copts = ["-w"],
+    copts = ["-w"] + DEFS,
     strip_include_prefix = "src/nanopb-0.2.8",
 )
 
@@ -20,7 +31,7 @@ cc_library(
     name = "protobuf_gen",
     srcs = ["src/protobuf_gen/FRIMessages.pb.c"],
     hdrs = ["src/protobuf_gen/FRIMessages.pb.h"],
-    copts = ["-w"],
+    copts = ["-w"] + DEFS,
     strip_include_prefix = "src/protobuf_gen",
     deps = [
         ":nanopb",
@@ -34,7 +45,7 @@ cc_library(
         "src/protobuf/*.cpp",
     ]),
     hdrs = glob(["src/protobuf/*.h"]),
-    copts = ["-w"],
+    copts = ["-w"] + DEFS,
     strip_include_prefix = "src/protobuf",
     deps = [
         ":nanopb",
@@ -45,7 +56,7 @@ cc_library(
 cc_library(
     name = "clientbase_header",
     hdrs = glob(["src/base/*.h"]),
-    copts = ["-w"],
+    copts = ["-w"] + DEFS,
     strip_include_prefix = "src/base",
     deps = [
         ":nanopb",
@@ -58,14 +69,14 @@ cc_library(
     name = "kuka-fri-lib",
     srcs = glob([
         "src/base/*.cpp",
-        "src/client_lbr/*.cpp",
+        "src/client_*/*.cpp",
         "src/connection/*.cpp",
     ]),
     hdrs = glob(["include/*.h"]),
     copts = [
         "-fpermissive",
         "-w",
-    ],
+    ] + DEFS,
     strip_include_prefix = "include",
     visibility = ["//visibility:public"],
     deps = [
