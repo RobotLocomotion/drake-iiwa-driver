@@ -2,6 +2,7 @@
 #include <sched.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <sys/time.h>
 
 #include <cassert>
 #include <chrono>
@@ -92,6 +93,11 @@ DEFINE_int32(priority, 90, "Priority for realtime scheduling");
 DEFINE_bool(restart_fri, false,
             "Restart robot motion after the FRI signal has degraded and "
             "been restored.");
+DEFINE_double(start_command_guard, 0.250, "Duration after publishing the "
+              "first status message for which the driver must receive no "
+              "command messages.  This is intended to guard against controllers "
+              "which were accidentally left running after a previous "
+              "invocation of this driver.");
 
 namespace kuka_driver {
 
@@ -388,6 +394,20 @@ class KukaLCMClient  {
   }
 
   void PublishStateUpdate() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    const uint64_t now = (tv.tv_sec * 1000000) + tv.tv_usec;
+
+    if (first_publish_attempt_us_ < 0) {
+      first_publish_attempt_us_ = now;
+    }
+
+    const uint64_t command_guard = FLAGS_start_command_guard * 1000000;
+    if (now - first_publish_attempt_us_ < command_guard) {
+      command_started_ = false;
+    } else {
+      command_started_ = true;
+    }
     lcm_.publish(FLAGS_lcm_status_channel, &lcm_status_);
     lcm_.publish(FLAGS_lcm_status_telemetry_channel, &lcm_status_telemetry_);
   }
@@ -396,6 +416,10 @@ class KukaLCMClient  {
   void HandleCommandMessage(const lcm::ReceiveBuffer* rbuf,
                             const std::string& chan,
                             const lcmt_iiwa_command* command) {
+    if (!command_started_) {
+      throw std::runtime_error("First command received within guard time.  "
+                               "Aborting.");
+    }
     lcm_command_ = *command;
   }
 
@@ -412,6 +436,11 @@ class KukaLCMClient  {
   std::vector<int64_t> utime_last_;
 
   TimeSyncFilter sync_;
+
+  // Implement a guard against receiving commands which are unlikely to be
+  // valid on startup.
+  int64_t first_publish_attempt_us_{-1};
+  bool command_started_{false};
 };
 
 class KukaFRIClient : public KUKA::FRI::LBRClient {
