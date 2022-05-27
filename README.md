@@ -21,76 +21,77 @@ appropriately.
 
 ## Sunrise Workbench
 
-Provisioning the IIWA arm must be done from Sunrise Workbench.
+Provisioning the IIWA arm must be done from Sunrise Workbench. Please ensure
+that you have Sunrise Workbench 1.14 installed, and that it is compatible with
+your control cabinet (see below). If you need instructions for older
+versions, please see [`1faf413`](https://github.com/RobotLocomotion/drake-iiwa-driver/tree/1faf413).
+
+When installing, the default checkboxes for Connectivity Software should cover
+the use cases needed here.
 
 The computer running Sunrise Workbench must be configured with an
 address which can communicate with 172.31.1.147/16, and which is
 connected to the X66 port.
 
-### Installing Sunrise Connectivity Software
+**Note**: Try to briefly familiarize yourself with first-party documentation
+from KUKA. For relevant software, the documents should be named something
+along the lines of "KUKA Sunrise.OS / KUKA Sunrise.Workbench",
+"KUKA Sunrise.FRI".
 
-**Note**: This step may no longer be necessary with newer version of Sunrise
-which install options such as FRI during the main installation
-process.  For older versions, see below.
+### Backing up Existing Applications / Checking Compatibility
 
-In order to use FRI to drive the arms additional software must be
-installed. In the DVD's that were shipped to you their should be one
-called "Media". It should contain files with names like
-`0000288631_00_KUKA Sunrise.FRI 1.13_1.13.0_B6_C358496.zip`. These are
-Java packages. In order to use them when developing the Sunrise
-Workbench Application they must be installed. In kuka speak these are
-called "software options". In the SunriseWorkbench documentation
-(1.11) Section 10.5.1 details how to install software options. The
-basic steps are
+Before creating a new project, it is recommended to back up existing projects
+from the controller. This is useful for backing up *and* ensuring that your
+Sunrise Workbench is compatible with the Sunrise OS installed on the control
+cabinet.
 
-  * In dropdown menu **Help->Install new software**
-  * In the rop right of the **Work with** box click **Add**
-  * Click **Archive** and navigate to where the aforementioned zip file is.
-  * Hit **Ok** and then select that software option when it appears with checkbox.
-  * Keep hitting **next** until it is installed.
-  * Make sure to restart SunriseWorkbench when prompted.
+* (Optional) Switch to a new workspace: File -> Switch Workspace.
+* File -> New -> Sunrise project
+  * Select "Load project from controller"
+  * Instructions from here should be straightforward.
 
 ### Creating the Java Application
 
 TODO(sam.creasey) Can I just zip up a project/workspace?
 
   * File -> New -> SunriseProject
-    * IP address of the controller can be left at `172.31.1.147`
+    * IP address of the controller can be left at 172.31.1.147
     * Create new project
-    * Project Name: `DrakeFRIDriver`
-    * Topology template: `LBR iiwa 14 R820` (or the appropriate model)
-    * Media Flange: `Medien-Flansch Touch pneumatisch` (or the appropriate model)
-    * Create Application
+    * Project Name: DrakeFRIDriver
+    * Topology template: LBR iiwa 14 R820 (or the appropriate model)
+    * Media Flange: Medien-Flansch Touch pneumatisch (or the appropriate model)
+    * Uncheck "Create Sunrise application (starts another wizard)"
     * Source folder: whatever
-    * Package: `drake_fri`
-    * Name: `DrakeFRIDriver`
+    * Package: drake_fri
+    * Name: DrakeFRIDriver
 
-  * In "Package Explorer", select `StationSetup.cat`
-    * Software (leave anything checked which already is, I think)
-      * Fast Robot Interface
+  * In "Package Explorer", select StationSetup.cat
+    * Software
+      * Leave anything that is already checked as-is
+      * Check "Fast Robot Interface Extension"
     * Save (Ctrl-S)
 
-  * In "Package Explorer", select `SafetyConfiguration.sconf`
+  * In "Package Explorer", select SafetyConfiguration.sconf
     * Customer PSM
       * Uncheck row 1 "External EMERGENCY STOP"
       * Uncheck row 2 "Operator Protection",
       * Uncheck row 3 "Safety Stop"
 
-  * Copy the Java source code for `DrakeFRIPositionDriver` and
-  `DrakeFRITorqueDriver`.
-    * KUKA changed the spelling of the Java FRI interface as of Sunrise OS version 1.11.  The appropriate sources files can be found in either `kuka-driver/sunrise_1.7` or `kuka-driver/sunrise_1.11`  (NOTE: The `sunrise_1.7` version is no longer actively tested, as I don't have any cabinets still running the older version of the software).
-    * Copy `DrakeFRIPositionDriver.java` and `DrakeFRITorqueDriver` to `DrakeFRIDriver/src/drake_fri` (make sure Sunrise sees the update, you may need to import the files into the project).  You can remove any exising `DrakeFRIDriver`.
+  * Copy the Java source code for DrakeFRIPositionDriver and DrakeFRITorqueDriver.
+    * In "Package Explorer", expand tree for your new project, navigate to `src`, right-click, and select New -> Package. Name this new package `drake_fri`.
+    * Use code from `kuka-driver/sunrise_1.14`.
+    * Copy DrakeFRIPositionDriver.java and DrakeFRITorqueDriver to DrakeFRIDriver/src/drake_fri. It may be easiest to drag and drop from a Windows Explorer window into the "Package Explorer" pane.  You can remove any exising DrakeFRIDriver files.
 
-  * In "Package Explorer", select `StationSetup.cat`
+  * In "Package Explorer", select StationSetup.cat
     * Installation
-        * Push "Install" (this will not actually install the application, but it will wipe the existing configuration of the KUKA cabinet and replace it with yours).  It will take a few minutes, and eventually will reboot the controller.
+      * Push "Install" (this will not actually install the application, but it will wipe the existing configuration of the KUKA cabinet and replace it with yours).  It will take a few minutes, and eventually will reboot the controller.
 
-  * Press the "sync" button.  It's on the toolbar at the top, 5th from the right.  It looks a bit like a square with a couple of arrows over it (though it doesn't look much like this).  This will install the application.
+  * Press the "sync" button.  It's on the toolbar at the top, 5th from the right.  It looks a bit like a square with a couple of arrows over it (though it doesn't look much like this).  This will compile the Java source code and install the resulting applications.
     * Execute
 
 ### Enabling the Safety Configuration on the Robot
 
-When you upload a new safety configuration to the robot it needs to be enabled. To do this, start at the main page on the pendant and go to `Safety-->Activation`. Then click `Activation`. Use the default user, the password is `argus`. This should enable the new configuration.
+When you upload a new safety configuration to the robot it needs to be enabled. To do this go to `Safety-->Activation` on the pendant. Then click `Activation`. Use the default user, the password is `argus`. This should enable the new configuration.
 
 ## C++ driver
 
