@@ -66,8 +66,9 @@ TODO(sam.creasey) Can I just zip up a project/workspace?
   * Name: DrakeFRIDriver
 
  * In "Package Explorer", select StationSetup.cat
-  * Software (leave anything checked which already is, I think)
-   * Fast Robot Interface
+  * Software
+   * Leave anything that is already checked as-is
+   * Check "Fast Robot Interface Extension"
   * Save (Ctrl-S)
 
  * In "Package Explorer", select SafetyConfiguration.sconf
