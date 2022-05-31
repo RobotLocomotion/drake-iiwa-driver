@@ -54,41 +54,43 @@ basic steps are
 
 TODO(sam.creasey) Can I just zip up a project/workspace?
 
- * File -> New -> SunriseProject
-  * IP address of the controller can be left at 172.31.1.147
-  * Create new project
-  * Project Name: DrakeFRIDriver
-  * Topology template: LBR iiwa 14 R820 (or the appropriate model)
-  * Media Flange: Medien-Flansch Touch pneumatisch (or the appropriate model)
-  * Create Application
-  * Source folder: whatever
-  * Package: drake_fri
-  * Name: DrakeFRIDriver
+  * File -> New -> SunriseProject
+    * IP address of the controller can be left at `172.31.1.147`
+    * Create new project
+    * Project Name: `DrakeFRIDriver`
+    * Topology template: `LBR iiwa 14 R820` (or the appropriate model)
+    * Media Flange: `Medien-Flansch Touch pneumatisch` (or the appropriate model)
+    * Create Application
+    * Source folder: whatever
+    * Package: `drake_fri`
+    * Name: `DrakeFRIDriver`
 
- * In "Package Explorer", select StationSetup.cat
-  * Software (leave anything checked which already is, I think)
-   * Fast Robot Interface
-  * Save (Ctrl-S)
+  * In "Package Explorer", select `StationSetup.cat`
+    * Software (leave anything checked which already is, I think)
+      * Fast Robot Interface
+    * Save (Ctrl-S)
 
- * In "Package Explorer", select SafetyConfiguration.sconf
-  * Customer PSM
-   * Uncheck row 1 "External EMERGENCY STOP"
-   * Uncheck row 2 "Operator Protection",
-   * Uncheck row 3 "Safety Stop"
+  * In "Package Explorer", select `SafetyConfiguration.sconf`
+    * Customer PSM
+      * Uncheck row 1 "External EMERGENCY STOP"
+      * Uncheck row 2 "Operator Protection",
+      * Uncheck row 3 "Safety Stop"
 
- * Copy the Java source code for DrakeFRIPositionDriver and DrakeFRITorqueDriver.
-  * KUKA changed the spelling of the Java FRI interface as of Sunrise OS version 1.11.  The appropriate sources files can be found in either kuka-driver/sunrise_1.7 or kuka-driver/sunrise_1.11  (NOTE: The sunrise_1.7 version is no longer actively tested, as I don't have any cabinets still running the older version of the software).
-  * Copy DrakeFRIPositionDriver.java and DrakeFRITorqueDriver to DrakeFRIDriver/src/drake_fri (make sure Sunrise sees the update, you may need to import the files into the project).  You can remove any exising DrakeFRIDriver.
+  * Copy the Java source code for `DrakeFRIPositionDriver` and
+  `DrakeFRITorqueDriver`.
+    * KUKA changed the spelling of the Java FRI interface as of Sunrise OS version 1.11.  The appropriate sources files can be found in either `kuka-driver/sunrise_1.7` or `kuka-driver/sunrise_1.11`  (NOTE: The `sunrise_1.7` version is no longer actively tested, as I don't have any cabinets still running the older version of the software).
+    * Copy `DrakeFRIPositionDriver.java` and `DrakeFRITorqueDriver` to `DrakeFRIDriver/src/drake_fri` (make sure Sunrise sees the update, you may need to import the files into the project).  You can remove any exising `DrakeFRIDriver`.
 
- * In "Package Explorer", select StationSetup.cat
-  * Installation
-    * Push "Install" (this will not actually install the application, but it will wipe the existing configuration of the KUKA cabinet and replace it with yours).  It will take a few minutes, and eventually will reboot the controller.
+  * In "Package Explorer", select `StationSetup.cat`
+    * Installation
+        * Push "Install" (this will not actually install the application, but it will wipe the existing configuration of the KUKA cabinet and replace it with yours).  It will take a few minutes, and eventually will reboot the controller.
 
- * Press the "sync" button.  It's on the toolbar at the top, 5th from the right.  It looks a bit like a square with a couple of arrows over it (though it doesn't look much like this).  This will install the application.
-  * Execute
+  * Press the "sync" button.  It's on the toolbar at the top, 5th from the right.  It looks a bit like a square with a couple of arrows over it (though it doesn't look much like this).  This will install the application.
+    * Execute
 
-## Enabling the Safety Configuration on the Robot
-When you upload a new safety configuration to the robot it needs to be enabled. To do this go to `Safety-->Activation` on the pendant. Then click `Activation`. Use the default user, the password is `argus`. This should enable the new configuration.
+### Enabling the Safety Configuration on the Robot
+
+When you upload a new safety configuration to the robot it needs to be enabled. To do this, start at the main page on the pendant and go to `Safety-->Activation`. Then click `Activation`. Use the default user, the password is `argus`. This should enable the new configuration.
 
 ## C++ driver
 
