@@ -36,7 +36,9 @@ template <typename T> class DiscreteTimeLowPassFilter {
    *
    * @throws std::logic_error if @p alpha is smaller than 0 or bigger than 1.
    */
-  DiscreteTimeLowPassFilter(T alpha) : alpha_(alpha) { check_alpha(); }
+  explicit DiscreteTimeLowPassFilter(T alpha) : alpha_(alpha) {
+    check_alpha();
+  }
 
   /**
    * Initializes the internal value to @p val.

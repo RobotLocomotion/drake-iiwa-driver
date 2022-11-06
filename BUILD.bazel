@@ -1,0 +1,21 @@
+# -*- python -*
+
+load("//tools/lint:lint.bzl", "add_lint_tests")
+
+genrule(
+    name = "_copy_config",
+    srcs = [
+        "@drake//:.bazelproject",
+        "@drake//:.clang-format",
+        "@drake//:CPPLINT.cfg",
+    ],
+    outs = [
+        ".bazelproject",
+        ".clang-format",
+        "CPPLINT.cfg",
+    ],
+    cmd = "cp $(SRCS) $(RULEDIR)/",
+    visibility = ["//visibility:public"],
+)
+
+add_lint_tests()
