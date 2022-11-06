@@ -7,7 +7,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstring>
-
 #include <iostream>
 #include <limits>
 #include <stdexcept>
@@ -94,9 +93,9 @@ DEFINE_bool(restart_fri, false,
             "been restored.");
 DEFINE_double(start_command_guard, 0.250, "Duration after publishing the "
               "first status message for which the driver must receive no "
-              "command messages.  This is intended to guard against controllers "
-              "which were accidentally left running after a previous "
-              "invocation of this driver.");
+              "command messages.  This is intended to guard against "
+              "controllers which were accidentally left running after a "
+              "previous invocation of this driver.");
 
 namespace kuka_driver {
 
@@ -110,7 +109,7 @@ class TimeSyncFilter {
    * @param num_measurement Number of initial measurements to build a
    * reasonable estimate of the time difference.
    */
-  TimeSyncFilter(uint64_t num_measurement)
+  explicit TimeSyncFilter(uint64_t num_measurement)
     : num_measurement_(num_measurement), filter_(0.99) {}
 
   /**
@@ -159,7 +158,6 @@ class KukaLCMClient  {
  public:
   KukaLCMClient(int num_robots, const std::string& lcm_url)
       : num_joints_(num_robots * kNumJoints), lcm_(lcm_url), sync_(200) {
-
     // Use -1 as a sentinal to indicate that no status has been
     // sent (or received from the robot).
     lcm_status_.utime = -1;
@@ -460,8 +458,9 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
 
   ~KukaFRIClient() {}
 
-  virtual void onStateChange(KUKA::FRI::ESessionState oldState,
-                             KUKA::FRI::ESessionState newState) {
+  void onStateChange(
+      KUKA::FRI::ESessionState oldState,
+      KUKA::FRI::ESessionState newState) override {
     KUKA::FRI::LBRClient::onStateChange(oldState, newState);
 
     const KUKA::FRI::LBRState& state = robotState();
@@ -486,7 +485,6 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
       std::memcpy(joint_position_when_command_entered_.data(),
                   state.getMeasuredJointPosition(),
                   kNumJoints * sizeof(double));
-      //lcm_command_.utime = -1;
 
       if (!has_entered_command_state_) {
         has_entered_command_state_ = true;
@@ -508,7 +506,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
     }
   }
 
-  virtual void monitor() {
+  void monitor() override {
     KUKA::FRI::LBRClient::monitor();
     lcm_client_->UpdateRobotState(robot_id_, robotState());
     if (!lcm_client_->CheckSafety(robot_id_)) {
@@ -518,7 +516,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
     }
   }
 
-  virtual void waitForCommand() {
+  void waitForCommand() override {
     KUKA::FRI::LBRClient::waitForCommand();
 
     // The value of the torques sent in waitForCommand doesn't matter,
@@ -536,7 +534,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
     }
   }
 
-  virtual void command() {
+  void command() override {
     lcm_client_->UpdateRobotState(robot_id_, robotState());
     if (!lcm_client_->CheckSafety(robot_id_)) {
       lcm_client_->PrintRobotState(robot_id_, std::cerr);
@@ -670,7 +668,7 @@ int do_main() {
     bool robot_stepped = false;
     for (int i = 0; i < FLAGS_num_robots; i++) {
       if (fds[i].revents != 0) {
-	robot_stepped = true;
+        robot_stepped = true;
         fds[i].revents = 0;  // TODO(sam.creasey) do I actually need
                              // to clear that?
         success = apps[i].step();
@@ -690,7 +688,7 @@ int do_main() {
   return 0;
 }
 
-} // namespace kuka_driver
+}  // namespace kuka_driver
 
 int main(int argc, char** argv) {
   gflags::ParseCommandLineFlags(&argc, &argv, true);
