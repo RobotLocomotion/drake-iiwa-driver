@@ -26,8 +26,7 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
     private int _clientPort;
 
     @Override
-    public void initialize()
-    {
+    public void initialize() {
         _lbrController = (Controller) getContext().getControllers().toArray()[0];
         _lbr = (LBR) _lbrController.getDevices().toArray()[0];
         // **********************************************************************
@@ -45,12 +44,10 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
 
         FRISession friSession = new FRISession(friConfiguration);
         // wait until FRI session is ready to switch to command mode
-        try
-        {
+        try {
             friSession.await(3600, TimeUnit.SECONDS);
         }
-        catch (final TimeoutException e)
-        {
+        catch (final TimeoutException e) {
             getLogger().error(e.getLocalizedMessage());
             friSession.close();
             return;
@@ -63,18 +60,17 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
         PositionHold posHold = new PositionHold(ctrMode, -1, TimeUnit.SECONDS);
 
         try {
-          _lbr.move(posHold.addMotionOverlay(jointOverlay));
+            _lbr.move(posHold.addMotionOverlay(jointOverlay));
         } catch (final CommandInvalidException e) {
-          getLogger().error(e.getLocalizedMessage());
+            getLogger().error(e.getLocalizedMessage());
+        } finally {
+            // done
+            friSession.close();
         }
-
-        // done
-        friSession.close();
     }
 
     @Override
-    public void run()
-    {
+    public void run() {
         // configure and start FRI session
         FRIConfiguration friConfiguration = FRIConfiguration.createRemoteConfiguration(_lbr, _clientName);
         friConfiguration.setSendPeriodMilliSec(5);
@@ -84,16 +80,8 @@ public class DrakeFRIPositionDriver extends RoboticsAPIApplication
         }
     }
 
-    /**
-     * main.
-     *
-     * @param args
-     *            args
-     */
-    public static void main(final String[] args)
-    {
+    public static void main(final String[] args) {
         final DrakeFRIPositionDriver app = new DrakeFRIPositionDriver();
         app.runApplication();
     }
-
 }
