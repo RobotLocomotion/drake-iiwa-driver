@@ -19,6 +19,7 @@
 #include "friLBRClient.h"
 #include "friUdpConnection.h"
 
+#include "drake/common/drake_assert.h"
 #include "drake/lcmt_iiwa_command.hpp"
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/lcmt_iiwa_status_telemetry.hpp"
@@ -37,11 +38,14 @@ const int kDefaultPort = 30200;
 const char* kLcmStatusChannel = "IIWA_STATUS";
 const char* kLcmStatusTelemetryChannel = "IIWA_STATUS_TELEMETRY";
 const char* kLcmCommandChannel = "IIWA_COMMAND";
-const double kTimeStep = 0.005;
 const double kJointLimitSafetyMarginDegree = 1;
 const double kJointTorqueSafetyMarginNm = 60;
-const double kJointTorqueSafetyMarginScale[kNumJoints] = {1, 1, 1, 0.5,
-                                                          0.2, 0.2, 0.1};
+const double kJointTorqueSafetyMarginScale[kNumJoints] = {
+    1, 1, 1, 0.5, 0.2, 0.2, 0.1};
+const double kTorqueOnlyKp[kNumJoints] = {
+    1000, 1000, 1000, 500, 500, 500, 500};
+const double kTorqueOnlyKd[kNumJoints] = {
+    50, 50, 50, 50, 35, 35, 35};
 
 double ToRadians(double degrees) {
   return degrees * M_PI / 180.;
@@ -96,6 +100,21 @@ DEFINE_double(start_command_guard, 0.250, "Duration after publishing the "
               "command messages.  This is intended to guard against "
               "controllers which were accidentally left running after a "
               "previous invocation of this driver.");
+DEFINE_double(time_step, 0.005, "Desired time step.");
+
+DEFINE_bool(
+    torque_only, false, "Send torques only; should set --time_step=0.001");
+DEFINE_double(
+    torque_only_kp_scale, 1.0,
+    "Scaling for position gains when inactive.");
+DEFINE_double(
+    torque_only_kd_scale, 1.0,
+    "Scaling for velocity gains when inactive.");
+DEFINE_double(
+    command_expire, 0.05,
+    "Time since last receipt of message to indicate expiration. This will "
+    "make the driver inhibit motion. At present, only used for "
+    "--torque_only=true.");
 
 namespace kuka_driver {
 
@@ -169,6 +188,7 @@ class KukaLCMClient  {
     lcm_status_.joint_torque_measured.resize(num_joints_, 0);
     lcm_status_.joint_torque_commanded.resize(num_joints_, 0);
     lcm_status_.joint_torque_external.resize(num_joints_, 0);
+    vel_filtered_.resize(num_joints_, 0);
 
     // Use -1 as a sentinal to indicate that no command has been
     // received.
@@ -205,7 +225,8 @@ class KukaLCMClient  {
     // Initialize filters.
     const double cutoff_hz = 40;
     vel_filters_.resize(
-        num_joints_, DiscreteTimeLowPassFilter<double>(cutoff_hz, kTimeStep));
+        num_joints_, DiscreteTimeLowPassFilter<double>(
+            cutoff_hz, FLAGS_time_step));
     utime_last_.resize(num_robots, -1);
 
     lcm::Subscription* sub = lcm_.subscribe(FLAGS_lcm_command_channel,
@@ -228,9 +249,9 @@ class KukaLCMClient  {
     if (utime_last_.at(robot_id) != -1) {
       robot_dt = (remote_utime - utime_last_.at(robot_id)) / 1e6;
       // Check timing
-      if (std::abs(robot_dt - kTimeStep) > 1e-3) {
+      if (std::abs(robot_dt - FLAGS_time_step) > 1e-3) {
         std::cout << "Warning: dt " << robot_dt
-                  << ", kTimeStep " << kTimeStep << "\n";
+                  << ", FLAGS_time_step " << FLAGS_time_step << "\n";
       }
     }
     utime_last_.at(robot_id) = remote_utime;
@@ -254,8 +275,8 @@ class KukaLCMClient  {
         const int index = joint_offset + i;
         const double q_diff = state.getMeasuredJointPosition()[i] -
                               lcm_status_.joint_position_measured[index];
-        lcm_status_.joint_velocity_estimated[index] =
-            vel_filters_[index].filter(q_diff / robot_dt);
+        vel_filtered_[index] = vel_filters_[index].filter(q_diff / robot_dt);
+        lcm_status_.joint_velocity_estimated[index] = vel_filtered_[index];
       }
     }
 
@@ -298,6 +319,10 @@ class KukaLCMClient  {
                 state.getExternalTorque(), kNumJoints * sizeof(double));
   }
 
+  const double* GetVelocityFiltered() const {
+    return vel_filtered_.data();
+  }
+
   /// @returns true if robot @p robot_id is in a safe state. Currently only
   /// checks the external torques field.
   ///
@@ -318,6 +343,7 @@ class KukaLCMClient  {
     return true;
   }
 
+  // TODO(eric.cousineau): Use YAML archive serialization.
   void PrintRobotState(int robot_id, std::ostream& out) const {
     const int joint_offset = robot_id * kNumJoints;
     assert(joint_offset + kNumJoints <= num_joints_);
@@ -409,6 +435,12 @@ class KukaLCMClient  {
     lcm_.publish(FLAGS_lcm_status_telemetry_channel, &lcm_status_telemetry_);
   }
 
+  bool IsCommandExpired() const {
+    const uint64_t expire_utime = FLAGS_command_expire * 1e6;
+    const uint64_t stale_utime = micros() - command_receipt_utime_;
+    return stale_utime > expire_utime;
+  }
+
  private:
   void HandleCommandMessage(const lcm::ReceiveBuffer* rbuf,
                             const std::string& chan,
@@ -418,6 +450,7 @@ class KukaLCMClient  {
                                "Aborting.");
     }
     lcm_command_ = *command;
+    command_receipt_utime_ = micros();
   }
 
   const int num_joints_;
@@ -425,11 +458,12 @@ class KukaLCMClient  {
   lcmt_iiwa_status lcm_status_{};
   lcmt_iiwa_status_telemetry lcm_status_telemetry_{};
   lcmt_iiwa_command lcm_command_{};
-
+  uint64_t command_receipt_utime_{};
   std::vector<double> external_torque_limit_;
 
   // Filters
   std::vector<DiscreteTimeLowPassFilter<double>> vel_filters_;
+  std::vector<double> vel_filtered_;
   std::vector<int64_t> utime_last_;
 
   TimeSyncFilter sync_;
@@ -542,31 +576,84 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
                                " is in an unsafe state.");
     }
 
-    double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
-    const bool command_valid =
-        lcm_client_->GetPositionCommand(robot_id_, pos);
-    if (inhibit_motion_in_command_state_ || !command_valid) {
-      // No command received, just command the position when we
-      // entered command state.
-      assert(joint_position_when_command_entered_.size() == kNumJoints);
-      memcpy(pos, joint_position_when_command_entered_.data(),
-             kNumJoints * sizeof(double));
-    } else {
-      // Only apply the joint limits when we're responding to LCM.  If
-      // we don't want to command motion, don't change anything.
-      ApplyJointLimits(pos);
-    }
-    robotCommand().setJointPosition(pos);
+    // TODO(sam.creasey): Is there a sensible torque limit to saturate with or
+    // fault based on here?
 
-    // Check if we're in torque mode, and send torque commands too if
-    // we are.
-    if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
+    if (FLAGS_torque_only) {
+      DRAKE_DEMAND(robotState().getClientCommandMode() == KUKA::FRI::TORQUE);
+      const double *pos_measured = robotState().getMeasuredJointPosition();
+      // Loopback current state. We should have zero position and velocity gains
+      // but I (Eric) think this makes the controller happy (won't get "Illegal
+      // axis delta" or what not).
+      double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
+      memcpy(pos, pos_measured, kNumJoints * sizeof(double));
+      robotCommand().setJointPosition(pos);
+
       double torque[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
-      if (command_valid && !inhibit_motion_in_command_state_) {
-        lcm_client_->GetTorqueCommand(robot_id_, torque);
+
+      bool command_valid = lcm_client_->GetTorqueCommand(robot_id_, torque);
+      if (command_valid && lcm_client_->IsCommandExpired()) {
+        command_valid = false;
+        if (!warned_about_expiration_) {
+          std::cerr
+              << "Torque command expiration! Engaging holding controller."
+              << std::endl;
+          // Update hold position.
+          std::memcpy(
+              joint_position_when_command_entered_.data(),
+              pos_measured, kNumJoints * sizeof(double));
+          warned_about_expiration_ = true;
+        }
+      } else if (command_valid) {
+        if (warned_about_expiration_) {
+          std::cerr
+              << "Received fresh command. Resuming nominal control."
+              << std::endl;
+          warned_about_expiration_ = false;
+        }
       }
-      // TODO(sam.creasey): Is there a sensible torque limit to apply here?
+
+      if (inhibit_motion_in_command_state_ || !command_valid) {
+        // Position control holding current position.
+        const double* pos_desired =
+            joint_position_when_command_entered_.data();
+        const double* vel_estimated = lcm_client_->GetVelocityFiltered();
+        for (int i = 0; i < kNumJoints; ++i) {
+          const double kp_i = kTorqueOnlyKp[i] * FLAGS_torque_only_kp_scale;
+          const double kd_i = kTorqueOnlyKd[i] * FLAGS_torque_only_kd_scale;
+          const double pos_error_i = pos_measured[i] - pos_desired[i];
+          const double vel_error_i = vel_estimated[i];
+          torque[i] = -kp_i * pos_error_i - kd_i * vel_error_i;
+        }
+      }
       robotCommand().setTorque(torque);
+    } else {
+      double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
+      const bool command_valid =
+          lcm_client_->GetPositionCommand(robot_id_, pos);
+      if (inhibit_motion_in_command_state_ || !command_valid) {
+        // No command received, just command the position when we
+        // entered command state.
+        assert(joint_position_when_command_entered_.size() == kNumJoints);
+        memcpy(pos, joint_position_when_command_entered_.data(),
+               kNumJoints * sizeof(double));
+      } else {
+        // Only apply the joint limits when we're responding to LCM.  If
+        // we don't want to command motion, don't change anything.
+        ApplyJointLimits(pos);
+      }
+      robotCommand().setJointPosition(pos);
+
+      // Check if we're in torque mode, and send torque commands too if
+      // we are.
+      if (robotState().getClientCommandMode() == KUKA::FRI::TORQUE) {
+        double torque[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
+        if (command_valid && !inhibit_motion_in_command_state_) {
+          lcm_client_->GetTorqueCommand(robot_id_, torque);
+        }
+        // TODO(sam.creasey): Is there a sensible torque limit to apply here?
+        robotCommand().setTorque(torque);
+      }
     }
   }
 
@@ -587,6 +674,7 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
   std::vector<double> joint_position_when_command_entered_;
   bool has_entered_command_state_{false};
   bool inhibit_motion_in_command_state_{false};
+  bool warned_about_expiration_{};
 };
 
 int do_main() {
