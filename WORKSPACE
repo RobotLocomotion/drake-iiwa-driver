@@ -14,6 +14,7 @@ new_local_repository(
     "v1.9.0",
     "a80a38d51bf2608489f7b44a882d00b76dac9765590afbfcf0c17090c16501ab",
 )
+
 DRAKE_STRIP_PREFIX = "drake-1.9.0"
 # If using commit vs. a tag, uncomment below.
 # DRAKE_STRIP_PREFIX = "drake-v{}".format(DRAKE_COMMIT)

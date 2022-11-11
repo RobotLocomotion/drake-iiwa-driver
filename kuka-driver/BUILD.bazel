@@ -10,9 +10,6 @@ cc_binary(
         "kuka_driver.cc",
         "low_pass_filter.h",
     ],
-    # TODO(eric.cousineau): Figure out why clang-format-includes via Drake's
-    # linting is unable to fix the errors it finds.
-    tags = ["nolint"],
     deps = [
         "@drake//common:essential",
         "@drake//lcmtypes:iiwa",

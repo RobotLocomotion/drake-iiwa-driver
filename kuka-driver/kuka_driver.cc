@@ -1,3 +1,4 @@
+// clang-format off
 #include <poll.h>
 #include <sched.h>
 #include <stdlib.h>
@@ -23,8 +24,10 @@
 #include "drake/lcmt_iiwa_status.hpp"
 #include "drake/lcmt_iiwa_status_telemetry.hpp"
 
-#include "low_pass_filter.h"
-
+#include "low_pass_filter.h"  // NOLINT(build/include)
+// TODO(eric.cousineau): Figure out why clang-format-includes via Drake's
+// linting is unable to fix the errors it finds.
+// clang-format on
 
 using drake::lcmt_iiwa_command;
 using drake::lcmt_iiwa_status;
