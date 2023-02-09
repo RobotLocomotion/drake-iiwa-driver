@@ -11,11 +11,11 @@ new_local_repository(
 )
 
 (DRAKE_COMMIT, DRAKE_CHECKSUM) = (
-    "v1.9.0",
-    "a80a38d51bf2608489f7b44a882d00b76dac9765590afbfcf0c17090c16501ab",
+    "v1.12.0",
+    "b9fc9e07d6741b51b028c9ee3a036be507b90268b75b70a6a1c75e4de04339ad",
 )
 
-DRAKE_STRIP_PREFIX = "drake-1.9.0"
+DRAKE_STRIP_PREFIX = "drake-1.12.0"
 # If using commit vs. a tag, uncomment below.
 # DRAKE_STRIP_PREFIX = "drake-v{}".format(DRAKE_COMMIT)
 
