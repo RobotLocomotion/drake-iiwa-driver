@@ -49,7 +49,7 @@ const double kTorqueOnlyKp[kNumJoints] = {
     1000, 1000, 1000, 500, 500, 500, 500};
 const double kTorqueOnlyKd[kNumJoints] = {
     50, 50, 50, 50, 35, 35, 35};
-
+const int numIIRCoeff = 1;
 double ToRadians(double degrees) {
   return degrees * M_PI / 180.;
 }
@@ -455,7 +455,6 @@ class KukaLCMClient  {
     lcm_command_ = *command;
     command_receipt_utime_ = micros();
   }
-
   const int num_joints_;
   lcm::LCM lcm_;
   lcmt_iiwa_status lcm_status_{};
@@ -491,6 +490,10 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
     joint_limits_.push_back(ToRadians(170));
     joint_limits_.push_back(ToRadians(120));
     joint_limits_.push_back(ToRadians(175));
+
+    // inititalize IIR filter (for torque_only mode)
+    memset(iir_filtered_output_, 0, sizeof(iir_filtered_output_));
+    memset(iir_filter_input_, 0, sizeof(iir_filter_input_));
   }
 
   ~KukaFRIClient() {}
@@ -546,6 +549,11 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
   void monitor() override {
     KUKA::FRI::LBRClient::monitor();
     lcm_client_->UpdateRobotState(robot_id_, robotState());
+    
+    // IIR filter initialization with measured data (should be run always)
+    for (int i = 0; i < numIIRCoeff + 1; i++) {
+      IIRFilter(robotState().getMeasuredJointPosition());
+    }
     if (!lcm_client_->CheckSafety(robot_id_)) {
       lcm_client_->PrintRobotState(robot_id_, std::cerr);
       throw std::runtime_error("Robot" + std::to_string(robot_id_) +
@@ -589,8 +597,12 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
       // but I (Eric) think this makes the controller happy (won't get "Illegal
       // axis delta" or what not).
       double pos[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
-      memcpy(pos, pos_measured, kNumJoints * sizeof(double));
+      for(int i = 0; i < kNumJoints; ++i) {
+        pos[i] = iir_filtered_output_[i][0];
+      }
       robotCommand().setJointPosition(pos);
+      // iir filter input
+      IIRFilter(pos_measured);
 
       double torque[kNumJoints] = { 0., 0., 0., 0., 0., 0., 0.};
 
@@ -669,6 +681,42 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
     }
   }
 
+  // IIR filter for joint position command. This is a hack to trigger the
+  // friction observer within the IIWA. The friction observer is only triggered
+  // when there is a position difference. So, an IIR filter is used so that
+  // there is a small delay between the measured position and the commanded
+  // position. The gains are chosen so that it doesn't add energy into the
+  // system. Thanks to Johannes Lachner for providing this code(part of:
+  // https://github.com/jlachner/Explicit-FRI). Explicit-FRI will be made
+  // public soon by Johannes Lachner.
+  void IIRFilter(const double sample[kNumJoints])
+  {
+    const double ACoef[numIIRCoeff + 1] = {0.05921059165970496400,
+                                           0.05921059165970496400};
+    const double BCoef[numIIRCoeff + 1] = {1.00000000000000000000,
+                                           -0.88161859236318907000};
+    int n;
+    // Shift the old samples
+    for (int i = 0; i < kNumJoints; i++) {
+      for (n = numIIRCoeff; n > 0; n--) {
+        iir_filter_input_[i][n] = iir_filter_input_[i][n - 1];
+        iir_filtered_output_[i][n] = iir_filtered_output_[i][n - 1];
+      }
+      }
+      // Calculate the new output
+      for (int i=0; i<kNumJoints; i++)
+      {
+          iir_filter_input_[i][0] = sample[i];
+          iir_filtered_output_[i][0] = ACoef[0] * iir_filter_input_[i][0];
+      }
+      for (int i=0; i<kNumJoints; i++)
+      {
+          for(n=1; n<=numIIRCoeff; n++) {
+            iir_filtered_output_[i][0] += ACoef[n] * iir_filter_input_[i][n] - BCoef[n] * iir_filtered_output_[i][n];
+          }
+      }
+  }
+
   int robot_id_;
   KukaLCMClient* lcm_client_;
   std::vector<double> joint_limits_;
@@ -678,6 +726,8 @@ class KukaFRIClient : public KUKA::FRI::LBRClient {
   bool has_entered_command_state_{false};
   bool inhibit_motion_in_command_state_{false};
   bool warned_about_expiration_{};
+  double iir_filtered_output_[kNumJoints][numIIRCoeff+1];
+  double iir_filter_input_[kNumJoints][numIIRCoeff+1];
 };
 
 int do_main() {
