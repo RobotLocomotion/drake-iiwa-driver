@@ -104,6 +104,8 @@ DEFINE_double(start_command_guard, 0.250, "Duration after publishing the "
               "controllers which were accidentally left running after a "
               "previous invocation of this driver.");
 DEFINE_double(time_step, 0.005, "Desired time step.");
+DEFINE_double(velocity_filter_cutoff, 40,
+              "Velocity filter cutoff frequency (Hz).");
 
 DEFINE_bool(
     torque_only, false, "Send torques only; should set --time_step=0.001");
@@ -226,10 +228,9 @@ class KukaLCMClient  {
     PrintVector(external_torque_limit_, 0, kNumJoints, std::cerr);
 
     // Initialize filters.
-    const double cutoff_hz = 40;
-    vel_filters_.resize(
-        num_joints_, DiscreteTimeLowPassFilter<double>(
-            cutoff_hz, FLAGS_time_step));
+    vel_filters_.resize(num_joints_,
+                        DiscreteTimeLowPassFilter<double>(
+                            FLAGS_velocity_filter_cutoff, FLAGS_time_step));
     utime_last_.resize(num_robots, -1);
 
     lcm::Subscription* sub = lcm_.subscribe(FLAGS_lcm_command_channel,
