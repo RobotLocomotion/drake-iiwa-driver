@@ -121,6 +121,11 @@ LCM into the command state, and report the IIWA status via LCM.
 An application wishing to control the arm should listen to LCM for
 status updates and command the joints appropriately in response.
 
+Before you begin, install the prerequisite:
+```
+sudo apt install libgflags-dev
+```
+
 The C++ driver can be build with either CMake or bazel.  There are two
 external dependencies which need to be provided, FRI and drake.
 
