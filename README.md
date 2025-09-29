@@ -126,7 +126,7 @@ Before you begin, install the prerequisite:
 sudo apt install libgflags-dev
 ```
 
-The C++ driver can be build with either CMake or bazel.  There are two
+The C++ driver can be build with either CMake or Bazel.  There are two
 external dependencies which need to be provided, FRI and drake.
 
 This repository is configured with a private git submodule for the
@@ -149,14 +149,14 @@ patch -p1 < ../fri_udp_connection_file_descriptor.diff
 The patch above applies correctly to the FRI 1.7, 1.11, and 1.14 source.
 Other versions have not been tested.
 
-#### Building with bazel
+#### Building with Bazel
 
-When building with bazel, it will automatically fetch a copy of drake
+When building with Bazel, it will automatically fetch a copy of drake
 to build against.  You should be able to run `bazel build //...` to
 produce a working driver.
 
 This is the easiest method for developers who are already working with
-the drake source, since a working bazel build enviornment for drake
+the drake source, since a working Bazel build enviornment for drake
 should be sufficient to build this package.
 
 #### Building with CMake

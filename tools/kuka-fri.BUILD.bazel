@@ -1,4 +1,4 @@
-# -*- python -*-
+# -*- bazel -*-
 
 DEFS = [
     # The trailing whitespace after the quote seems to be necessary.
