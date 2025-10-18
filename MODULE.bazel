@@ -1,27 +1,21 @@
-# -*- python -*-
-
 module(name = "drake_iiwa_driver")
 
 bazel_dep(name = "gflags", version = "2.2.2")
+bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 
 bazel_dep(name = "buildifier_prebuilt", version = "8.2.0.2", dev_dependency = True)
 
-new_local_repository = use_repo_rule("@bazel_tools//tools/build_defs/repo:local.bzl", "new_local_repository")
+extensions = use_extension("//:extensions.bzl", "extensions")
+use_repo(extensions, "kuka_fri")
 
-new_local_repository(
-    name = "kuka_fri",
-    build_file = "//tools:kuka-fri.BUILD.bazel",
-    path = "kuka-fri",
-)
-
-DRAKE_VERSION = "1.45.0"
+DRAKE_VERSION = "1.46.0"
 
 bazel_dep(name = "drake")
 archive_override(
     module_name = "drake",
     canonical_id = DRAKE_VERSION,
-    sha256 = "fd70210cbbe233b78bb6df2d8f42c7334ea15fca8833865322d788ab4eaf0c16",
+    sha256 = "9f65f24256785baf0bfdb06abb5fccf236d20d7c9344c21ec1aaf9d308fcb33c",
     strip_prefix = "drake-{}".format(DRAKE_VERSION),
     url = "https://github.com/RobotLocomotion/drake/releases/download/v{}/drake-{}-src.tar.gz".format(
         DRAKE_VERSION,
@@ -30,12 +24,12 @@ archive_override(
 )
 
 # TODO(jwnimmer-tri) Pin to >1.5.1 once there is a newer release tag.
-LCM_VERSION = "e4bed2c86fbd6dd2280326801acf71cbd05074be"
+LCM_VERSION = "4f9f586e9fda1ab2d5e12427386226519f65b6de"
 
 bazel_dep(name = "lcm")
 archive_override(
     module_name = "lcm",
-    sha256 = "b2bf5bf7fed61805d72855c8ea9d247de95e5ca885ee6c5c8c9185aa87dda74c",  # noqa
+    sha256 = "d2de73ea17993d3586eb9559b48ac3e35dd68064ad6abbdd3e0d4081e5b90685",  # noqa
     strip_prefix = "lcm-{}".format(LCM_VERSION),
     url = "https://github.com/lcm-proj/lcm/archive/{}.tar.gz".format(LCM_VERSION),
 )
