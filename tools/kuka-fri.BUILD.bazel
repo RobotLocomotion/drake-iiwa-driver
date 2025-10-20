@@ -1,5 +1,7 @@
 # -*- bazel -*-
 
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
 DEFS = [
     # The trailing whitespace after the quote seems to be necessary.
     '-DPB_SYSTEM_HEADER=\\"pb_syshdr.h\\" ',
