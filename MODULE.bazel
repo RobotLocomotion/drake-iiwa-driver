@@ -1,6 +1,7 @@
 module(name = "drake_iiwa_driver")
 
 bazel_dep(name = "gflags", version = "2.2.2")
+bazel_dep(name = "lcm", version = "1.5.2")
 bazel_dep(name = "rules_cc", version = "0.2.10")
 bazel_dep(name = "rules_shell", version = "0.6.1")
 
@@ -21,15 +22,4 @@ archive_override(
         DRAKE_VERSION,
         DRAKE_VERSION,
     ),
-)
-
-# TODO(jwnimmer-tri) Pin to >1.5.1 once there is a newer release tag.
-LCM_VERSION = "4f9f586e9fda1ab2d5e12427386226519f65b6de"
-
-bazel_dep(name = "lcm")
-archive_override(
-    module_name = "lcm",
-    sha256 = "d2de73ea17993d3586eb9559b48ac3e35dd68064ad6abbdd3e0d4081e5b90685",  # noqa
-    strip_prefix = "lcm-{}".format(LCM_VERSION),
-    url = "https://github.com/lcm-proj/lcm/archive/{}.tar.gz".format(LCM_VERSION),
 )
